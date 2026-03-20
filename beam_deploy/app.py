@@ -11,7 +11,7 @@ VOLUME_PATH = "./model_weights"
 
 def load_model():
     """Load model once per container lifecycle to avoid reloading on every request"""
-    from transformers import AutoTokenizer, AutoModelForCausalLM
+    from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
     import torch
     
     model_id = "Qwen/Qwen3.5-9B"
@@ -23,12 +23,18 @@ def load_model():
     )
     
     print(f"Loading model from {model_id}...")
-    # Use bfloat16 for Qwen3.5 (not float16)
+    # Use BitsAndBytesConfig for 4-bit quantization
+    quantization_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_compute_dtype=torch.bfloat16,
+        bnb_4bit_use_double_quant=True,
+        bnb_4bit_quant_type="nf4"
+    )
+    
     model = AutoModelForCausalLM.from_pretrained(
         model_id, 
-        torch_dtype=torch.bfloat16,
+        quantization_config=quantization_config,
         device_map="auto", 
-        load_in_4bit=True,
         cache_dir=VOLUME_PATH
     )
     
