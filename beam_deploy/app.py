@@ -11,23 +11,31 @@ VOLUME_PATH = "./model_weights"
 
 def load_model():
     """Load model once per container lifecycle to avoid reloading on every request"""
-    from transformers import AutoTokenizer, AutoModelForCausalLM
+    from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
     import torch
     
-    model_id = "HauhauCS/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive"
+    model_id = "huihui-ai/Qwen2.5-7B-Instruct-abliterated"
     
     print(f"Loading tokenizer from {model_id}...")
     tokenizer = AutoTokenizer.from_pretrained(
         model_id, 
-        cache_dir=VOLUME_PATH
+        cache_dir=VOLUME_PATH,
+        use_fast=False
     )
     
     print(f"Loading model from {model_id}...")
+    # Use BitsAndBytesConfig for 4-bit quantization
+    quantization_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_compute_dtype=torch.float16,
+        bnb_4bit_use_double_quant=True,
+        bnb_4bit_quant_type="nf4"
+    )
+    
     model = AutoModelForCausalLM.from_pretrained(
         model_id, 
-        torch_dtype=torch.float16,
+        quantization_config=quantization_config,
         device_map="auto", 
-        load_in_4bit=True,
         cache_dir=VOLUME_PATH
     )
     
@@ -42,16 +50,26 @@ def load_model():
             "transformers",
             "torch",
             "bitsandbytes",
-            "accelerate"
+            "accelerate",
+            "protobuf",
+            "sentencepiece",
+            "tiktoken",
+            "tokenizers"
+        ])
+        .add_commands([
+            "pip install sentencepiece tiktoken tokenizers --upgrade"
         ]),
-    gpu="A10G",
+    secrets=["HF_TOKEN"],
+    gpu="RTX4090",
     cpu=2,
     memory="16Gi",
     keep_warm_seconds=0,
     on_start=load_model,
+    checkpoint_enabled=True,
     volumes=[Volume(name="model-weights", mount_path=VOLUME_PATH)],
 )
 def generate(context, **inputs):
+    import torch
     """
     Main inference endpoint
     
