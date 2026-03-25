@@ -1,0 +1,32 @@
+# FastAPI and server
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+
+# Pydantic for data validation
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# LangChain for LLM integration
+langchain==0.1.4
+langchain-community==0.0.16
+
+# HTTP clients
+requests==2.31.0
+aiohttp==3.9.1
+
+# Appwrite SDK
+appwrite==11.0.0
+
+# Environment variables
+python-dotenv==1.0.0
+
+# JSON handling
+orjson==3.9.12
+
+# For async streaming
+sse-starlette==1.8.2
+
+# Optional: for production deployment
+gunicorn==21.2.0
+httpx==0.26.0

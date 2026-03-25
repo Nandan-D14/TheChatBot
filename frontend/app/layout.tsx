@@ -1,0 +1,26 @@
+import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
+import './globals.css'
+import AppwritePing from '@/components/AppwritePing'
+
+const inter = Inter({ subsets: ['latin'] })
+
+export const metadata: Metadata = {
+  title: 'TheChatBot',
+  description: 'Private ChatGPT-like chatbot powered by Qwen3.5-9B',
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body className={inter.className}>
+        <AppwritePing />
+        {children}
+      </body>
+    </html>
+  )
+}

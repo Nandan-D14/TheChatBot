@@ -1,0 +1,42 @@
+# Environment files — NEVER commit these (contain API keys!)
+.env
+.env.local
+.env.*.local
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+.venv/
+venv/
+env/
+.Python
+build/
+dist/
+*.egg-info/
+
+# Node.js / Next.js
+node_modules/
+.next/
+.turbo/
+out/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.claude/
+
+# Beam Cloud
+beam_deploy/__pycache__/
