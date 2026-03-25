@@ -39,7 +39,7 @@ export function Sidebar({ onSessionChange }: SidebarProps) {
       }
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/sessions?user_id=${userId}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/sessions/?user_id=${userId}`,
         { signal: controller.signal }
       )
 
@@ -86,7 +86,7 @@ export function Sidebar({ onSessionChange }: SidebarProps) {
       }
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/sessions`,
+        `${process.env.NEXT_PUBLIC_API_URL}/sessions/`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

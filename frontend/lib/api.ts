@@ -87,7 +87,7 @@ export async function sendChat(request: ChatRequest): Promise<string> {
  * Create a new session
  */
 export async function createSession(userId: string, title?: string): Promise<Session> {
-  const response = await fetch(`${API_URL}/sessions`, {
+  const response = await fetch(`${API_URL}/sessions/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ user_id: userId, title: title || 'New Chat' })
@@ -104,7 +104,7 @@ export async function createSession(userId: string, title?: string): Promise<Ses
  * Get all sessions for a user
  */
 export async function getSessions(userId: string): Promise<Session[]> {
-  const response = await fetch(`${API_URL}/sessions?user_id=${userId}`)
+  const response = await fetch(`${API_URL}/sessions/?user_id=${userId}`)
 
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`)
