@@ -1,12 +1,50 @@
 """
-LangChain memory management for conversation context
+Memory management for conversation context
 Supports both in-memory and Appwrite-backed storage
 """
 
-from langchain.memory import ConversationBufferWindowMemory
-from langchain.memory.chat_message_histories import ChatMessageHistory
 from typing import Optional, List, Dict
-import os
+
+
+class _Message:
+    """Simple message object compatible with existing `get_history` logic."""
+
+    def __init__(self, msg_type: str, content: str):
+        self.type = msg_type
+        self.content = content
+
+
+class _ChatMemory:
+    """In-memory chat history with window-size trimming."""
+
+    def __init__(self, window_size: int):
+        self.window_size = window_size
+        self.messages: List[_Message] = []
+
+    def _trim(self):
+        if self.window_size > 0 and len(self.messages) > self.window_size:
+            self.messages = self.messages[-self.window_size:]
+
+    def add_user_message(self, content: str):
+        self.messages.append(_Message("human", content))
+        self._trim()
+
+    def add_ai_message(self, content: str):
+        self.messages.append(_Message("ai", content))
+        self._trim()
+
+    def clear(self):
+        self.messages = []
+
+
+class _SimpleConversationBufferWindowMemory:
+    """Minimal replacement for the subset of behavior used by this project."""
+
+    def __init__(self, k: int):
+        self.chat_memory = _ChatMemory(window_size=k)
+
+    def clear(self):
+        self.chat_memory.clear()
 
 
 class ConversationMemory:
@@ -30,14 +68,8 @@ class ConversationMemory:
         self.session_id = session_id
         self.appwrite_service = appwrite_service
         
-        # Create the memory instance
-        self.memory = ConversationBufferWindowMemory(
-            k=window_size,
-            return_messages=return_messages,
-            output_key="output",
-            input_key="input",
-            chat_memory=ChatMessageHistory()
-        )
+        # Keep a bounded in-memory history.
+        self.memory = _SimpleConversationBufferWindowMemory(k=window_size)
         
         # Load existing messages if session_id provided
         if session_id and appwrite_service:
@@ -102,7 +134,7 @@ class ConversationMemory:
         messages = []
         for msg in self.get_messages():
             if hasattr(msg, "type"):
-                # LangChain message object
+                # Internal message object with `type` and `content`
                 role = "assistant" if msg.type == "ai" else "user"
                 content = msg.content
             else:
