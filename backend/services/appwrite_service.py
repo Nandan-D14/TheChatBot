@@ -4,10 +4,17 @@ Handles users, sessions, messages, and memory storage
 """
 
 from typing import List, Dict, Optional
-import os
+import logging
 import uuid
 from datetime import datetime
 from core.config import settings
+
+
+logger = logging.getLogger(__name__)
+
+
+class AppwritePersistenceError(Exception):
+    """Raised when Appwrite persistence operations fail."""
 
 
 class AppwriteService:
@@ -42,16 +49,37 @@ class AppwriteService:
             self._initialized = True
 
         except ImportError:
-            print("Warning: appwrite package not installed")
+            logger.exception("Appwrite package not installed")
             self._initialized = False
         except Exception as e:
-            print(f"Warning: Failed to initialize Appwrite: {e}")
+            logger.exception("Failed to initialize Appwrite client")
             self._initialized = False
     
     def _check_initialized(self):
         """Check if Appwrite client is initialized"""
         if not self._initialized:
-            raise Exception("Appwrite not initialized. Install appwrite package or provide mock.")
+            raise AppwritePersistenceError("Appwrite is not initialized")
+
+    def verify_ready(self) -> Dict[str, bool]:
+        """Verify Appwrite database and required collections are reachable."""
+        self._check_initialized()
+
+        readiness = {"sessions": False, "messages": False, "memory": False}
+        for collection_id in readiness:
+            try:
+                # A simple list call validates API key, DB id, and collection id.
+                self.databases.list_documents(self.database_id, collection_id)
+                readiness[collection_id] = True
+            except Exception as e:
+                logger.error(
+                    "Appwrite readiness check failed",
+                    extra={"database_id": self.database_id, "collection_id": collection_id, "error": str(e)}
+                )
+                raise AppwritePersistenceError(
+                    f"Collection '{collection_id}' is not accessible in database '{self.database_id}': {e}"
+                ) from e
+
+        return readiness
     
     # ==================== User Methods ====================
     
@@ -104,9 +132,6 @@ class AppwriteService:
         session_id = str(uuid.uuid4())
         created_at = datetime.utcnow().isoformat()
         
-        session_id = str(uuid.uuid4())
-        created_at = datetime.utcnow().isoformat()
-        
         try:
             return self.databases.create_document(
                 self.database_id,
@@ -120,13 +145,11 @@ class AppwriteService:
                 }
             )
         except Exception as e:
-            print(f"Warning: Appwrite create_session failed: {e}. Returning mock.")
-            return {
-                "session_id": session_id,
-                "user_id": user_id,
-                "title": title,
-                "created_at": created_at
-            }
+            logger.exception(
+                "Appwrite create_session_record failed",
+                extra={"database_id": self.database_id, "collection_id": "sessions", "user_id": user_id}
+            )
+            raise AppwritePersistenceError(f"Failed to create session record: {e}") from e
     
     def get_sessions(self, user_id: str) -> List[Dict]:
         """Get all sessions for a user"""
@@ -143,8 +166,11 @@ class AppwriteService:
             )
             return result.get("documents", [])
         except Exception as e:
-            print(f"Warning: Appwrite get_sessions failed: {e}. Returning empty list.")
-            return []
+            logger.exception(
+                "Appwrite get_sessions failed",
+                extra={"database_id": self.database_id, "collection_id": "sessions", "user_id": user_id}
+            )
+            raise AppwritePersistenceError(f"Failed to fetch sessions: {e}") from e
     
     def get_session(self, session_id: str) -> Optional[Dict]:
         """Get a specific session"""
@@ -156,7 +182,11 @@ class AppwriteService:
                 "sessions",
                 session_id
             )
-        except:
+        except Exception as e:
+            logger.warning(
+                "Appwrite get_session failed",
+                extra={"database_id": self.database_id, "collection_id": "sessions", "session_id": session_id, "error": str(e)}
+            )
             return None
     
     def update_session_title(self, session_id: str, title: str) -> Dict:
@@ -221,8 +251,11 @@ class AppwriteService:
                 }
             )
         except Exception as e:
-            print(f"Warning: Appwrite save_message failed: {e}. Ignored.")
-            return {}
+            logger.exception(
+                "Appwrite save_message failed",
+                extra={"database_id": self.database_id, "collection_id": "messages", "session_id": session_id, "role": role}
+            )
+            raise AppwritePersistenceError(f"Failed to save message: {e}") from e
     
     def get_messages(self, session_id: str) -> List[Dict]:
         """Get all messages for a session"""
@@ -239,8 +272,11 @@ class AppwriteService:
             )
             return result.get("documents", [])
         except Exception as e:
-            print(f"Warning: Appwrite get_messages failed: {e}. Returning empty list.")
-            return []
+            logger.exception(
+                "Appwrite get_messages failed",
+                extra={"database_id": self.database_id, "collection_id": "messages", "session_id": session_id}
+            )
+            raise AppwritePersistenceError(f"Failed to fetch messages: {e}") from e
     
     def get_message_count(self, session_id: str) -> int:
         """Get message count for a session"""
