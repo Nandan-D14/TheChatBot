@@ -1,10 +1,8 @@
 """
-Custom LangChain LLM wrapper for Beam Cloud inference
+Custom LLM wrapper for Beam Cloud inference
 Provides both sync and async methods for streaming support
 """
 
-from langchain.llms.base import LLM
-from langchain.callbacks.manager import CallbackManagerForLLMRun
 from typing import Optional, List, Any, Dict
 import requests
 import os
@@ -13,9 +11,9 @@ import time
 import asyncio
 
 
-class BeamLLM(LLM):
+class BeamLLM:
     """
-    Custom LangChain LLM that calls Beam Cloud endpoint
+    Custom LLM client that calls Beam Cloud endpoint
     
     Usage:
         llm = BeamLLM(
@@ -25,8 +23,9 @@ class BeamLLM(LLM):
         response = llm._call(prompt="Hello", history=[{"role": "user", "content": "Hi"}])
     """
     
-    endpoint_url: str = os.getenv("BEAM_ENDPOINT_URL", "")
-    beam_token: str = os.getenv("BEAM_TOKEN", "")
+    def __init__(self, endpoint_url: Optional[str] = None, beam_token: Optional[str] = None):
+        self.endpoint_url = endpoint_url or os.getenv("BEAM_ENDPOINT_URL", "")
+        self.beam_token = beam_token or os.getenv("BEAM_TOKEN", "")
     
     @property
     def _llm_type(self) -> str:
@@ -43,7 +42,7 @@ class BeamLLM(LLM):
         self,
         prompt: str,
         stop: Optional[List[str]] = None,
-        run_manager: Optional[CallbackManagerForLLMRun] = None,
+        run_manager: Optional[Any] = None,
         **kwargs: Any
     ) -> str:
         """
@@ -52,7 +51,7 @@ class BeamLLM(LLM):
         Args:
             prompt: The user's current prompt
             stop: Stop sequences (not used)
-            run_manager: LangChain callback manager
+            run_manager: Callback manager placeholder (unused)
             **kwargs: Additional arguments (history, temperature, etc.)
         
         Returns:
@@ -110,7 +109,7 @@ class BeamLLM(LLM):
         self,
         prompt: str,
         stop: Optional[List[str]] = None,
-        run_manager: Optional[CallbackManagerForLLMRun] = None,
+        run_manager: Optional[Any] = None,
         **kwargs: Any
     ) -> str:
         """
@@ -119,7 +118,7 @@ class BeamLLM(LLM):
         Args:
             prompt: The user's current prompt
             stop: Stop sequences (not used)
-            run_manager: LangChain callback manager
+            run_manager: Callback manager placeholder (unused)
             **kwargs: Additional arguments (history, temperature, etc.)
         
         Returns:
@@ -175,7 +174,7 @@ class BeamLLM(LLM):
         self,
         prompt: str,
         stop: Optional[List[str]] = None,
-        run_manager: Optional[CallbackManagerForLLMRun] = None,
+        run_manager: Optional[Any] = None,
         **kwargs: Any
     ):
         """
