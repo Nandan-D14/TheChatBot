@@ -155,6 +155,27 @@ Important behavior in `beam_deploy/app.py`:
 
 After deploy, copy the Beam URL into `backend/.env` as `BEAM_ENDPOINT_URL`.
 
+## CI/CD (GitHub Actions)
+
+Two workflows are now included under `.github/workflows`:
+
+- `ci.yml`: Runs on push/PR to `main`
+  - Backend: install deps + run API smoke tests
+  - Frontend: `npm ci`, `npm run build`
+- `cd-beam.yml`: Deploys Beam endpoint from `beam_deploy/`
+  - Triggers on `push` to `main` when `beam_deploy/**` changes
+  - Can also be run manually via `workflow_dispatch`
+
+### Required GitHub Secrets for CD
+
+Set these repository secrets before running the Beam deploy workflow:
+
+- `BEAM_TOKEN` (required)
+- `HF_TOKEN` (optional but recommended for gated/private models)
+- `HF_MODEL_ID` (optional override for model selection)
+
+If `BEAM_TOKEN` is not set, the deploy job is skipped safely.
+
 ## API Endpoints (Backend)
 
 - `GET /` - service metadata

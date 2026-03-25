@@ -1,0 +1,44 @@
+name: CD Beam Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "beam_deploy/**"
+
+jobs:
+  deploy-beam:
+    name: Deploy Beam Endpoint
+    runs-on: ubuntu-latest
+    env:
+      BEAM_TOKEN: ${{ secrets.BEAM_TOKEN }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_MODEL_ID: ${{ secrets.HF_MODEL_ID }}
+
+    defaults:
+      run:
+        working-directory: beam_deploy
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Beam CLI
+        if: ${{ env.BEAM_TOKEN != '' }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install beam-client
+
+      - name: Deploy endpoint
+        if: ${{ env.BEAM_TOKEN != '' }}
+        run: beam deploy app.py:generate
+
+      - name: Skip deploy when BEAM_TOKEN missing
+        if: ${{ env.BEAM_TOKEN == '' }}
+        run: echo "BEAM_TOKEN is not configured, skipping deploy."
