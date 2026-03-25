@@ -84,11 +84,18 @@ async def info():
 
 if __name__ == "__main__":
     import uvicorn
+    import os
+    
+    # Use Render's PORT environment variable if available, otherwise use settings
+    port = int(os.environ.get("PORT", settings.api_port))
+    
+    # Disable reload in production (Render sets RENDER environment variable)
+    is_production = os.environ.get("RENDER") == "true"
     
     uvicorn.run(
         "main:app",
         host=settings.api_host,
-        port=settings.api_port,
-        reload=True,
+        port=port,
+        reload=not is_production,
         log_level="info"
     )

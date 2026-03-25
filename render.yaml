@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: thechatbot-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: BEAM_ENDPOINT_URL
+        sync: false
+      - key: BEAM_TOKEN
+        sync: false
+      - key: APPWRITE_ENDPOINT
+        sync: false
+      - key: APPWRITE_PROJECT_ID
+        sync: false
+      - key: APPWRITE_API_KEY
+        sync: false
+      - key: APPWRITE_DB_ID
+        value: chatbot_db
+      - key: CORS_ORIGINS
+        sync: false
+      - key: HF_TOKEN
+        sync: false
+      - key: PYTHON_VERSION
+        value: 3.12.9
