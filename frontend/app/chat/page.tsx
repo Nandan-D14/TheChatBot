@@ -45,7 +45,7 @@ export default function ChatPage() {
       }
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/sessions`,
+        `${process.env.NEXT_PUBLIC_API_URL}/sessions/`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

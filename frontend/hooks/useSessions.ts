@@ -39,7 +39,7 @@ export function useSessions(): UseSessionsReturn {
       }
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/sessions?user_id=${userId}`
+        `${process.env.NEXT_PUBLIC_API_URL}/sessions/?user_id=${userId}`
       )
 
       if (!response.ok) {
@@ -62,7 +62,7 @@ export function useSessions(): UseSessionsReturn {
       if (!userId) return null
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/sessions`,
+        `${process.env.NEXT_PUBLIC_API_URL}/sessions/`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
