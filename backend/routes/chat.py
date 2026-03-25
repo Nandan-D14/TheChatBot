@@ -2,19 +2,16 @@
 Chat routes with streaming and non-streaming endpoints
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional, Dict
 import json
 import asyncio
-import logging
+import os
 
 from core.beam_llm import BeamLLM, get_beam_llm
-from services.appwrite_service import get_appwrite_service, AppwriteService, AppwritePersistenceError
-
-
-logger = logging.getLogger(__name__)
+from services.appwrite_service import get_appwrite_service, AppwriteService
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -56,12 +53,15 @@ async def chat_stream(
     
     async def token_generator():
         try:
-            # Save user message before generation so persistence failures are visible.
-            db.save_message(
-                session_id=request.session_id,
-                role="user",
-                content=request.prompt
-            )
+            # Save user message to database
+            try:
+                db.save_message(
+                    session_id=request.session_id,
+                    role="user",
+                    content=request.prompt
+                )
+            except Exception as e:
+                print(f"Warning: Failed to save user message: {e}")
             
             # Get response from Beam LLM (async for streaming)
             response = await llm._acall(
@@ -85,16 +85,15 @@ async def chat_stream(
                 # Small delay to simulate streaming (remove in production)
                 await asyncio.sleep(0.02)
             
-            # Save assistant message and emit explicit stream error if persistence fails.
+            # Save assistant message to database
             try:
                 db.save_message(
                     session_id=request.session_id,
                     role="assistant",
                     content=response
                 )
-            except AppwritePersistenceError as e:
-                logger.exception("Failed to persist assistant response", extra={"session_id": request.session_id})
-                yield f"data: {json.dumps({'error': str(e), 'persistence': True})}\n\n"
+            except Exception as e:
+                print(f"Warning: Failed to save assistant message: {e}")
             
             # Signal completion
             yield "data: {\"token\": \"\", \"complete\": true}\n\n"
@@ -137,19 +136,20 @@ async def chat_non_stream(
             max_tokens=512
         )
         
-        # Save messages to database; fail request if persistence fails.
-        db.save_message(request.session_id, "user", request.prompt)
-        db.save_message(request.session_id, "assistant", response)
+        # Save messages to database
+        try:
+            db.save_message(request.session_id, "user", request.prompt)
+            db.save_message(request.session_id, "assistant", response)
+        except Exception as e:
+            print(f"Warning: Failed to save messages: {e}")
         
         return ChatResponse(
             response=response,
             session_id=request.session_id
         )
         
-    except AppwritePersistenceError as e:
-        raise HTTPException(status_code=500, detail=f"Chat persistence error: {str(e)}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Chat error: {str(e)}")
+        raise Exception(f"Chat error: {str(e)}")
 
 
 @router.post("/stream-full")
@@ -167,11 +167,15 @@ async def chat_stream_full(
         buffer = ""
         
         try:
-            db.save_message(
-                session_id=request.session_id,
-                role="user",
-                content=request.prompt
-            )
+            # Save user message
+            try:
+                db.save_message(
+                    session_id=request.session_id,
+                    role="user",
+                    content=request.prompt
+                )
+            except:
+                pass
             
             # Stream from LLM
             async for chunk in llm._astream(
@@ -181,15 +185,15 @@ async def chat_stream_full(
                 buffer += chunk
                 yield f"data: {json.dumps({'chunk': chunk})}\n\n"
             
+            # Save assistant message
             try:
                 db.save_message(
                     session_id=request.session_id,
                     role="assistant",
                     content=buffer
                 )
-            except AppwritePersistenceError as e:
-                logger.exception("Failed to persist full-stream assistant response", extra={"session_id": request.session_id})
-                yield f"data: {json.dumps({'error': str(e), 'persistence': True})}\n\n"
+            except:
+                pass
             
             yield "data: [DONE]\n\n"
             

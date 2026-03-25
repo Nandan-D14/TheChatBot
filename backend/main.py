@@ -7,37 +7,23 @@ A private ChatGPT-like API powered by Beam Cloud Qwen3.5-9B LLM
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-import logging
 
 from core.config import settings
 from routes import chat, sessions, memory
-from services.appwrite_service import get_appwrite_service, AppwritePersistenceError
-
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-)
-logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan events"""
     # Startup
-    logger.info("=" * 50)
-    logger.info("TheChatBot API Starting...")
-    logger.info("Beam Endpoint: %s", settings.beam_endpoint_url)
-    logger.info("Appwrite Project: %s", settings.appwrite_project_id)
-    try:
-        readiness = get_appwrite_service().verify_ready()
-        logger.info("Appwrite readiness: %s", readiness)
-    except AppwritePersistenceError as e:
-        logger.error("Appwrite readiness check failed: %s", str(e))
-    logger.info("=" * 50)
+    print("=" * 50)
+    print("TheChatBot API Starting...")
+    print(f"Beam Endpoint: {settings.beam_endpoint_url}")
+    print(f"Appwrite Project: {settings.appwrite_project_id}")
+    print("=" * 50)
     yield
     # Shutdown
-    logger.info("TheChatBot API Shutting down...")
+    print("TheChatBot API Shutting down...")
 
 
 # Create FastAPI app
