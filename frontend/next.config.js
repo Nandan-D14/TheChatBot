@@ -13,7 +13,7 @@ const nextConfig = {
     optimizePackageImports: ['framer-motion', 'lucide-react'],
   },
   turbopack: {
-    root: 'C:\\Users\\nanda\\OneDrive\\Desktop\\TheChatBot\\frontend',
+    root: __dirname,
   },
 }
 
