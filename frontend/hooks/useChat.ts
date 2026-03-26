@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 
 export interface Message {
   role: 'user' | 'assistant'
@@ -13,6 +13,8 @@ export interface UseChatReturn {
   clearMessages: () => void
 }
 
+const REQUEST_TIMEOUT_MS = 60000
+
 /**
  * Custom hook for managing chat with SSE streaming
  */
@@ -21,6 +23,49 @@ export function useChat(sessionId: string): UseChatReturn {
   const [streaming, setStreaming] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+
+  useEffect(() => {
+    const loadMessages = async () => {
+      if (!sessionId || sessionId === 'demo_session') {
+        setMessages([])
+        return
+      }
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort('request-timeout'), REQUEST_TIMEOUT_MS)
+
+      try {
+        setError(null)
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/sessions/${sessionId}/messages`,
+          { signal: controller.signal }
+        )
+
+        clearTimeout(timeoutId)
+
+        if (!response.ok) {
+          throw new Error(`Failed to load chat history: ${response.status} ${response.statusText}`)
+        }
+
+        const data = await response.json()
+        const sessionMessages = (data.messages || []).map((m: any) => ({
+          role: m.role,
+          content: m.content,
+        }))
+        setMessages(sessionMessages)
+      } catch (e: unknown) {
+        clearTimeout(timeoutId)
+        if (e instanceof Error && e.name === 'AbortError') {
+          setError('Request timed out while loading chat history.')
+          return
+        }
+        setError(e instanceof Error ? e.message : 'Failed to load chat history')
+        setMessages([])
+      }
+    }
+
+    loadMessages()
+  }, [sessionId])
 
   const sendMessage = useCallback(async (prompt: string) => {
     // Cancel any ongoing request

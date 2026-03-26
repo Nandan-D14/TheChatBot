@@ -8,7 +8,7 @@ import { Plus, MessageSquare, AlertCircle, X } from 'lucide-react'
 import { getUserIdSafe } from '@/lib/userIdentity'
 
 
-const REQUEST_TIMEOUT_MS = 25000
+const REQUEST_TIMEOUT_MS = 60000
 
 interface SidebarProps {
   onSessionChange?: (sessionId: string) => void

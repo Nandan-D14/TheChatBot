@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 
-from services.appwrite_service import get_appwrite_service, AppwriteService
+from services.appwrite_service import get_appwrite_service, AppwriteService, AppwritePersistenceError
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -58,6 +58,8 @@ async def create_session(
             title=result.get("title", "New Chat"),
             created_at=result.get("created_at", "")
         )
+    except AppwritePersistenceError as e:
+        raise HTTPException(status_code=503, detail=f"Failed to create session: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create session: {str(e)}")
 
@@ -84,6 +86,8 @@ async def get_sessions(
             )
             for s in sessions
         ]
+    except AppwritePersistenceError as e:
+        raise HTTPException(status_code=503, detail=f"Failed to get sessions: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get sessions: {str(e)}")
 
@@ -110,6 +114,8 @@ async def get_session(
         )
     except HTTPException:
         raise
+    except AppwritePersistenceError as e:
+        raise HTTPException(status_code=503, detail=f"Failed to get session: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get session: {str(e)}")
 
@@ -140,6 +146,8 @@ async def update_session(
         )
     except HTTPException:
         raise
+    except AppwritePersistenceError as e:
+        raise HTTPException(status_code=503, detail=f"Failed to update session: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update session: {str(e)}")
 
@@ -155,6 +163,8 @@ async def delete_session(
     try:
         db.delete_session_record(session_id)
         return {"status": "deleted", "session_id": session_id}
+    except AppwritePersistenceError as e:
+        raise HTTPException(status_code=503, detail=f"Failed to delete session: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete session: {str(e)}")
 
@@ -183,5 +193,7 @@ async def get_session_messages(
             ],
             "count": len(messages)
         }
+    except AppwritePersistenceError as e:
+        raise HTTPException(status_code=503, detail=f"Failed to get messages: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get messages: {str(e)}")
