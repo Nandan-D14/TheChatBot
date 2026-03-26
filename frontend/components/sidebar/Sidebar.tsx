@@ -5,6 +5,10 @@ import { useRouter } from 'next/navigation'
 import { SessionItem } from './SessionItem'
 import { Session } from '@/hooks/useSessions'
 import { Plus, MessageSquare, AlertCircle, X } from 'lucide-react'
+import { getUserIdSafe } from '@/lib/userIdentity'
+
+
+const REQUEST_TIMEOUT_MS = 25000
 
 interface SidebarProps {
   onSessionChange?: (sessionId: string) => void
@@ -29,10 +33,10 @@ export function Sidebar({ onSessionChange }: SidebarProps) {
 
     // Create abort controller for timeout
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+    const timeoutId = setTimeout(() => controller.abort('request-timeout'), REQUEST_TIMEOUT_MS)
 
     try {
-      const userId = localStorage.getItem('temp_user_id') || localStorage.getItem('user_id')
+      const userId = getUserIdSafe()
       if (!userId) {
         setError('User not authenticated. Please refresh the page.')
         return
@@ -77,10 +81,10 @@ export function Sidebar({ onSessionChange }: SidebarProps) {
     setCreating(true)
 
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 10000)
+    const timeoutId = setTimeout(() => controller.abort('request-timeout'), REQUEST_TIMEOUT_MS)
 
     try {
-      const userId = localStorage.getItem('temp_user_id') || localStorage.getItem('user_id')
+      const userId = getUserIdSafe()
       if (!userId) {
         throw new Error('User not authenticated. Please refresh the page.')
       }
@@ -131,7 +135,7 @@ export function Sidebar({ onSessionChange }: SidebarProps) {
     setDeletingId(sessionId)
 
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 10000)
+    const timeoutId = setTimeout(() => controller.abort('request-timeout'), REQUEST_TIMEOUT_MS)
 
     try {
       const response = await fetch(

@@ -5,6 +5,10 @@ import { useRouter } from 'next/navigation'
 import { Sidebar } from '@/components/sidebar/Sidebar'
 import { ChatWindow } from '@/components/chat/ChatWindow'
 import { AlertCircle, X } from 'lucide-react'
+import { ensureTempUserIdSafe, getUserIdSafe } from '@/lib/userIdentity'
+
+
+const REQUEST_TIMEOUT_MS = 25000
 
 export default function ChatPage() {
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -13,18 +17,8 @@ export default function ChatPage() {
   const router = useRouter()
 
   useEffect(() => {
-    // Check if user is authenticated (simplified for now)
-    // In production, check Appwrite auth state
-    const userId = localStorage.getItem('user_id')
-    
-    if (!userId) {
-      // For demo, create a temporary user ID
-      let tempUserId = localStorage.getItem('temp_user_id')
-      if (!tempUserId) {
-        tempUserId = 'demo_user_' + Math.random().toString(36).substring(7)
-        localStorage.setItem('temp_user_id', tempUserId)
-      }
-    }
+    // Ensure a usable identity even when localStorage is restricted.
+    ensureTempUserIdSafe()
 
     // Create a new session if none exists
     createNewSession()
@@ -35,10 +29,10 @@ export default function ChatPage() {
     setIsCreatingSession(true)
 
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+    const timeoutId = setTimeout(() => controller.abort('request-timeout'), REQUEST_TIMEOUT_MS)
 
     try {
-      const userId = localStorage.getItem('temp_user_id') || localStorage.getItem('user_id')
+      const userId = getUserIdSafe()
 
       if (!userId) {
         throw new Error('User not authenticated. Please refresh the page.')
