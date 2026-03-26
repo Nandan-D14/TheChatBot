@@ -6,6 +6,9 @@ import { Plus, Loader2, PanelLeftClose } from 'lucide-react'
 import { SessionItem } from './SessionItem'
 import { getAuthHeaders, hasValidAccessKey } from '@/lib/userIdentity'
 
+const SESSION_FETCH_TIMEOUT_MS = 65000
+const SESSION_FETCH_RETRY_DELAY_MS = 1200
+
 interface Session {
   session_id: string
   title: string
@@ -34,22 +37,41 @@ export function Sidebar({ onSessionChange, onClose }: SidebarProps) {
 
   const fetchSessions = async () => {
     setIsLoading(true)
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort('request-timeout'), 15000)
 
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/sessions/?user_id=shared-app-user`,
-        { headers: { ...getAuthHeaders() }, signal: controller.signal }
-      )
-      clearTimeout(timeoutId)
-      
-      if (response.ok) {
+    const fetchOnce = async () => {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort('request-timeout'), SESSION_FETCH_TIMEOUT_MS)
+
+      try {
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/sessions/?user_id=shared-app-user`,
+          { headers: { ...getAuthHeaders() }, signal: controller.signal }
+        )
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch sessions: ${response.status}`)
+        }
+
         const data = await response.json()
         setSessions(data)
+      } finally {
+        clearTimeout(timeoutId)
       }
+    }
+
+    try {
+      await fetchOnce()
     } catch (error) {
-      console.error('Failed to fetch sessions:', error)
+      if (error instanceof Error && error.name === 'AbortError') {
+        try {
+          await new Promise((resolve) => setTimeout(resolve, SESSION_FETCH_RETRY_DELAY_MS))
+          await fetchOnce()
+        } catch (retryError) {
+          console.error('Failed to fetch sessions after retry:', retryError)
+        }
+      } else {
+        console.error('Failed to fetch sessions:', error)
+      }
     } finally {
       setIsLoading(false)
     }
