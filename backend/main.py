@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
+import os
 
 from core.config import settings
 from routes import chat, sessions, memory
@@ -34,6 +35,9 @@ async def lifespan(app: FastAPI):
         logger.info("Appwrite readiness: %s", readiness)
     except AppwritePersistenceError as e:
         logger.error("Appwrite readiness check failed: %s", str(e))
+        if os.environ.get("RENDER") == "true":
+            # In production, fail fast so bad Appwrite config is surfaced during deploy.
+            raise RuntimeError(f"Appwrite readiness failed: {str(e)}") from e
     logger.info("=" * 50)
     yield
     # Shutdown
@@ -93,12 +97,12 @@ async def info():
     return {
         "beam_endpoint_configured": bool(settings.beam_endpoint_url and settings.beam_endpoint_url != "https://your-app.beam.cloud"),
         "appwrite_configured": bool(settings.appwrite_project_id and settings.appwrite_project_id != "your_project_id"),
+        "appwrite_db_id_configured": bool(settings.appwrite_db_id and settings.appwrite_db_id != "chatbot_db"),
     }
 
 
 if __name__ == "__main__":
     import uvicorn
-    import os
     
     # Use Render's PORT environment variable if available, otherwise use settings
     port = int(os.environ.get("PORT", settings.api_port))
