@@ -17,7 +17,7 @@ services:
       - key: APPWRITE_API_KEY
         sync: false
       - key: APPWRITE_DB_ID
-        value: chatbot_db
+        value: 69c4c0ad003c47ccb036
       - key: CORS_ORIGINS
         sync: false
       - key: HF_TOKEN

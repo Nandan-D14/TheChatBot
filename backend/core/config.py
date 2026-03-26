@@ -4,6 +4,7 @@ Uses pydantic-settings for environment variable management
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import AliasChoices, Field
 from typing import List
 
 
@@ -25,7 +26,13 @@ class Settings(BaseSettings):
     appwrite_endpoint: str = "http://localhost/v1"
     appwrite_project_id: str = "your_project_id"
     appwrite_api_key: str = "your_api_key"
-    appwrite_db_id: str = "chatbot_db"
+    appwrite_db_id: str = Field(
+        default="chatbot_db",
+        validation_alias=AliasChoices("APPWRITE_DB_ID", "APPWRITE_DATABASE_ID"),
+    )
+    appwrite_sessions_collection_id: str = "sessions"
+    appwrite_messages_collection_id: str = "messages"
+    appwrite_memory_collection_id: str = "memory"
     
     # API Configuration
     api_host: str = "0.0.0.0"
