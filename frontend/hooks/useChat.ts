@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { getAuthHeaders } from '@/lib/userIdentity'
 
 export interface Message {
   role: 'user' | 'assistant'
@@ -15,18 +16,65 @@ export interface UseChatReturn {
 
 const REQUEST_TIMEOUT_MS = 60000
 
+function buildSessionTitleFromPrompt(prompt: string): string {
+  const normalized = prompt.replace(/\s+/g, ' ').trim()
+  if (!normalized) {
+    return 'New Chat'
+  }
+
+  const maxLen = 48
+  if (normalized.length <= maxLen) {
+    return normalized
+  }
+
+  return `${normalized.slice(0, maxLen - 1)}…`
+}
+
 /**
  * Custom hook for managing chat with SSE streaming
  */
-export function useChat(sessionId: string): UseChatReturn {
+export function useChat(sessionId?: string): UseChatReturn {
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(sessionId || null)
   const [messages, setMessages] = useState<Message[]>([])
   const [streaming, setStreaming] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
+    setActiveSessionId(sessionId || null)
+  }, [sessionId])
+
+  const createSessionIfNeeded = useCallback(async (initialTitle?: string): Promise<string> => {
+    if (activeSessionId) {
+      return activeSessionId
+    }
+
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/sessions/?user_id=shared-app-user`, {
+      method: 'POST',
+      headers: {
+        ...getAuthHeaders(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ title: initialTitle || 'New Chat', user_id: 'shared-app-user' }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to create session: ${response.status} ${response.statusText}`)
+    }
+
+    const data = await response.json()
+    const createdSessionId = data?.session_id
+    if (!createdSessionId) {
+      throw new Error('Failed to create session: missing session id')
+    }
+
+    setActiveSessionId(createdSessionId)
+    return createdSessionId
+  }, [activeSessionId])
+
+  useEffect(() => {
     const loadMessages = async () => {
-      if (!sessionId || sessionId === 'demo_session') {
+      if (!activeSessionId || activeSessionId === 'demo_session') {
         setMessages([])
         return
       }
@@ -37,8 +85,8 @@ export function useChat(sessionId: string): UseChatReturn {
       try {
         setError(null)
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/sessions/${sessionId}/messages`,
-          { signal: controller.signal }
+          `${process.env.NEXT_PUBLIC_API_URL}/sessions/${activeSessionId}/messages`,
+          { headers: { ...getAuthHeaders() }, signal: controller.signal }
         )
 
         clearTimeout(timeoutId)
@@ -65,7 +113,7 @@ export function useChat(sessionId: string): UseChatReturn {
     }
 
     loadMessages()
-  }, [sessionId])
+  }, [activeSessionId])
 
   const sendMessage = useCallback(async (prompt: string) => {
     // Cancel any ongoing request
@@ -79,6 +127,8 @@ export function useChat(sessionId: string): UseChatReturn {
 
     // Add user message immediately
     const userMessage: Message = { role: 'user', content: prompt }
+    const isFirstMessageInSession = messages.length === 0
+    const hadSessionBeforeSend = !!activeSessionId
     setMessages(prev => [...prev, userMessage])
 
     // Add placeholder for assistant response
@@ -88,15 +138,34 @@ export function useChat(sessionId: string): UseChatReturn {
     let buffer = ''
 
     try {
+      const title = buildSessionTitleFromPrompt(prompt)
+      const resolvedSessionId = await createSessionIfNeeded(title)
+
+      if (isFirstMessageInSession && hadSessionBeforeSend) {
+        try {
+          await fetch(`${process.env.NEXT_PUBLIC_API_URL}/sessions/${resolvedSessionId}`, {
+            method: 'PATCH',
+            headers: {
+              ...getAuthHeaders(),
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ title }),
+          })
+        } catch {
+          // Title update should not block chat response.
+        }
+      }
+
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/chat/stream`,
         {
           method: 'POST',
           headers: {
+            ...getAuthHeaders(),
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            session_id: sessionId,
+            session_id: resolvedSessionId,
             prompt,
             history: messages,
           }),
@@ -147,7 +216,7 @@ export function useChat(sessionId: string): UseChatReturn {
     } finally {
       setStreaming(false)
     }
-  }, [sessionId, messages])
+  }, [activeSessionId, createSessionIfNeeded, messages])
 
   const clearMessages = useCallback(() => {
     setMessages([])

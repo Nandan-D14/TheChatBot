@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     # API Configuration
     api_host: str = "0.0.0.0"
     api_port: int = 8000
+    app_access_key: str = "PES2UG23CS363"
     
     # HuggingFace Token
     hf_token: str = ""

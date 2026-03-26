@@ -9,7 +9,6 @@ from datetime import datetime
 
 class CreateSessionRequest(BaseModel):
     """Request to create a new session"""
-    user_id: str
     title: Optional[str] = "New Chat"
 
 

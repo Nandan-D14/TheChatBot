@@ -42,6 +42,7 @@ class AppwriteService:
             from appwrite.client import Client
             from appwrite.services.databases import Databases
             from appwrite.services.users import Users
+            from appwrite.services.account import Account
 
             self.client = Client()
             # Use settings from config.py which loads .env file
@@ -55,6 +56,8 @@ class AppwriteService:
             self.memory_collection_id = settings.appwrite_memory_collection_id
             self.databases = Databases(self.client)
             self.users = Users(self.client)
+            self._account_service_cls = Account
+            self._client_cls = Client
             self._operation_timeout_s = int(getattr(settings, "appwrite_operation_timeout_s", 20) or 20)
             self._max_retries = int(getattr(settings, "appwrite_max_retries", 2) or 2)
             self._retry_backoff_s = float(getattr(settings, "appwrite_retry_backoff_s", 0.4) or 0.4)
@@ -139,11 +142,84 @@ class AppwriteService:
         return readiness
     
     # ==================== User Methods ====================
+
+    def _build_public_client(self):
+        client = self._client_cls()
+        client.set_endpoint(settings.appwrite_endpoint)
+        client.set_project(settings.appwrite_project_id)
+        return client
+
+    def create_user_account(self, email: str, password: str, name: Optional[str] = None) -> Dict:
+        """Create an Appwrite user account via server-side Users API."""
+        self._check_initialized()
+        try:
+            return self._call_with_retry(
+                "create_user_account.users_create",
+                self.users.create,
+                "unique()",
+                email=email,
+                password=password,
+                name=name,
+            )
+        except Exception as e:
+            raise AppwritePersistenceError(f"Failed to create user: {e}") from e
+
+    def create_email_password_session(self, email: str, password: str) -> Dict:
+        """Create an email/password session using public Account API."""
+        self._check_initialized()
+        try:
+            account = self._account_service_cls(self._build_public_client())
+            return self._call_with_retry(
+                "create_email_password_session.account_create",
+                account.create_email_password_session,
+                email,
+                password,
+            )
+        except Exception as e:
+            raise AppwritePersistenceError(f"Failed to create login session: {e}") from e
+
+    def create_user_jwt(self, user_id: str, session_id: Optional[str] = None) -> Dict:
+        """Create JWT for a user (optionally tied to a session)."""
+        self._check_initialized()
+        try:
+            return self._call_with_retry(
+                "create_user_jwt.users_create_jwt",
+                self.users.create_jwt,
+                user_id,
+                session_id=session_id,
+            )
+        except Exception as e:
+            raise AppwritePersistenceError(f"Failed to create auth token: {e}") from e
+
+    def verify_jwt(self, jwt: str) -> Dict:
+        """Validate JWT and return Appwrite account payload."""
+        self._check_initialized()
+        try:
+            client = self._build_public_client()
+            client.set_jwt(jwt)
+            account = self._account_service_cls(client)
+            return self._call_with_retry(
+                "verify_jwt.account_get",
+                account.get,
+            )
+        except Exception as e:
+            raise AppwritePersistenceError(f"Failed to verify token: {e}") from e
+
+    def delete_user_sessions(self, user_id: str):
+        """Delete all active sessions for a user."""
+        self._check_initialized()
+        try:
+            return self._call_with_retry(
+                "delete_user_sessions.users_delete_sessions",
+                self.users.delete_sessions,
+                user_id,
+            )
+        except Exception as e:
+            raise AppwritePersistenceError(f"Failed to delete sessions: {e}") from e
     
     def create_user(self, email: str, password: str) -> Dict:
         """Create a new user"""
-        self._check_initialized()
-        return self.users.create(email, password)
+        return self.create_user_account(email, password)
     
     def get_user(self, user_id: str) -> Dict:
         """Get user by ID"""
