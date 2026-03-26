@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
+import { getUserIdSafe } from '@/lib/userIdentity'
 
 export interface Session {
   session_id: string
@@ -24,7 +25,7 @@ export function useSessions(): UseSessionsReturn {
   const [error, setError] = useState<string | null>(null)
 
   const getUserId = () => {
-    return localStorage.getItem('temp_user_id') || localStorage.getItem('user_id')
+    return getUserIdSafe()
   }
 
   const refreshSessions = useCallback(async () => {
