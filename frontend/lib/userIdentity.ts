@@ -1,40 +1,78 @@
-const FALLBACK_USER_ID = `demo_user_${Math.random().toString(36).slice(2, 10)}`
+const ACCESS_KEY_STORAGE_KEY = 'chatbot_access_key'
+const ACCESS_KEY_EXPIRY_STORAGE_KEY = 'chatbot_access_key_expires_at'
+const ACCESS_KEY_TTL_MS = 60 * 60 * 1000
 
 function canUseStorage(): boolean {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
 }
 
-export function getUserIdSafe(): string | null {
+function getExpectedAccessKey(): string {
+  return process.env.NEXT_PUBLIC_APP_ACCESS_KEY?.trim() || 'PES2UG23CS363'
+}
+
+export function clearStoredAccessKey(): void {
   if (!canUseStorage()) {
-    return FALLBACK_USER_ID
+    return
   }
 
   try {
-    return localStorage.getItem('temp_user_id') || localStorage.getItem('user_id') || FALLBACK_USER_ID
+    localStorage.removeItem(ACCESS_KEY_STORAGE_KEY)
+    localStorage.removeItem(ACCESS_KEY_EXPIRY_STORAGE_KEY)
   } catch {
-    return FALLBACK_USER_ID
+    // Ignore storage errors and treat as logged out.
   }
 }
 
-export function ensureTempUserIdSafe(): string {
+export function setAccessKeyForOneHour(accessKey: string): void {
   if (!canUseStorage()) {
-    return FALLBACK_USER_ID
+    return
+  }
+
+  const expiresAt = Date.now() + ACCESS_KEY_TTL_MS
+  localStorage.setItem(ACCESS_KEY_STORAGE_KEY, accessKey)
+  localStorage.setItem(ACCESS_KEY_EXPIRY_STORAGE_KEY, String(expiresAt))
+}
+
+export function getStoredAccessKey(): string | null {
+  if (!canUseStorage()) {
+    return null
   }
 
   try {
-    const existingUserId = localStorage.getItem('user_id')
-    if (existingUserId) {
-      return existingUserId
+    const accessKey = localStorage.getItem(ACCESS_KEY_STORAGE_KEY)
+    const expiresAtRaw = localStorage.getItem(ACCESS_KEY_EXPIRY_STORAGE_KEY)
+
+    if (!accessKey || !expiresAtRaw) {
+      clearStoredAccessKey()
+      return null
     }
 
-    let tempUserId = localStorage.getItem('temp_user_id')
-    if (!tempUserId) {
-      tempUserId = FALLBACK_USER_ID
-      localStorage.setItem('temp_user_id', tempUserId)
+    const expiresAt = Number(expiresAtRaw)
+    if (!Number.isFinite(expiresAt) || Date.now() >= expiresAt) {
+      clearStoredAccessKey()
+      return null
     }
 
-    return tempUserId
+    return accessKey
   } catch {
-    return FALLBACK_USER_ID
+    clearStoredAccessKey()
+    return null
   }
+}
+
+export function hasValidAccessKey(): boolean {
+  return !!getStoredAccessKey()
+}
+
+export function isAccessKeyValid(accessKey: string): boolean {
+  return accessKey.trim() === getExpectedAccessKey()
+}
+
+export function getAuthHeaders(): Record<string, string> {
+  const key = getStoredAccessKey()
+  if (!key) {
+    return {}
+  }
+
+  return { 'x-app-access-key': key }
 }

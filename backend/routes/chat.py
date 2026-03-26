@@ -11,6 +11,7 @@ import asyncio
 import logging
 
 from core.beam_llm import BeamLLM, get_beam_llm
+from core.auth import get_current_user
 from services.appwrite_service import get_appwrite_service, AppwriteService, AppwritePersistenceError
 
 
@@ -42,9 +43,51 @@ def get_db() -> AppwriteService:
     return get_appwrite_service()
 
 
+def _require_session_ownership(session_id: str, user_id: str, db: AppwriteService):
+    session = db.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if session.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+
+def _build_session_title_from_prompt(prompt: str) -> str:
+    normalized = " ".join(prompt.split()).strip()
+    if not normalized:
+        return "New Chat"
+
+    max_len = 48
+    if len(normalized) <= max_len:
+        return normalized
+
+    return f"{normalized[:max_len - 3]}..."
+
+
+def _auto_title_session_from_prompt(db: AppwriteService, session_id: str, prompt: str):
+    """Update the session title from the first user prompt when still generic."""
+    try:
+        message_count = db.get_message_count(session_id)
+        if message_count > 0:
+            return
+
+        session = db.get_session(session_id)
+        if not session:
+            return
+
+        current_title = (session.get("title") or "").strip()
+        if current_title not in ("", "New Chat", "Untitled"):
+            return
+
+        db.update_session_title(session_id, _build_session_title_from_prompt(prompt))
+    except Exception:
+        # Non-blocking improvement; chat should continue even if title update fails.
+        logger.exception("Failed to auto-title session", extra={"session_id": session_id})
+
+
 @router.post("/stream")
 async def chat_stream(
     request: ChatRequest,
+    current_user: dict = Depends(get_current_user),
     llm: BeamLLM = Depends(get_llm),
     db: AppwriteService = Depends(get_db)
 ):
@@ -54,8 +97,12 @@ async def chat_stream(
     The response is streamed token by token for real-time UI updates
     """
     
+    _require_session_ownership(request.session_id, current_user["user_id"], db)
+
     async def token_generator():
         try:
+            _auto_title_session_from_prompt(db, request.session_id, request.prompt)
+
             # Save user message before generation so persistence failures are visible.
             db.save_message(
                 session_id=request.session_id,
@@ -119,6 +166,7 @@ async def chat_stream(
 @router.post("/non-stream", response_model=ChatResponse)
 async def chat_non_stream(
     request: ChatRequest,
+    current_user: dict = Depends(get_current_user),
     llm: BeamLLM = Depends(get_llm),
     db: AppwriteService = Depends(get_db)
 ):
@@ -129,6 +177,9 @@ async def chat_non_stream(
     """
     
     try:
+        _require_session_ownership(request.session_id, current_user["user_id"], db)
+        _auto_title_session_from_prompt(db, request.session_id, request.prompt)
+
         # Get response from Beam LLM
         response = await llm._acall(
             prompt=request.prompt,
@@ -155,6 +206,7 @@ async def chat_non_stream(
 @router.post("/stream-full")
 async def chat_stream_full(
     request: ChatRequest,
+    current_user: dict = Depends(get_current_user),
     llm: BeamLLM = Depends(get_llm),
     db: AppwriteService = Depends(get_db)
 ):
@@ -163,10 +215,14 @@ async def chat_stream_full(
     Uses async generator for true streaming from the LLM
     """
     
+    _require_session_ownership(request.session_id, current_user["user_id"], db)
+
     async def full_stream_generator():
         buffer = ""
         
         try:
+            _auto_title_session_from_prompt(db, request.session_id, request.prompt)
+
             db.save_message(
                 session_id=request.session_id,
                 role="user",

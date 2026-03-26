@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { getUserIdSafe } from '@/lib/userIdentity'
+import { getAuthHeaders } from '@/lib/userIdentity'
 
 export interface Session {
   session_id: string
@@ -24,23 +24,14 @@ export function useSessions(): UseSessionsReturn {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const getUserId = () => {
-    return getUserIdSafe()
-  }
-
   const refreshSessions = useCallback(async () => {
     setLoading(true)
     setError(null)
 
     try {
-      const userId = getUserId()
-      if (!userId) {
-        setSessions([])
-        return
-      }
-
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/sessions/?user_id=${userId}`
+        `${process.env.NEXT_PUBLIC_API_URL}/sessions/?user_id=shared-app-user`,
+        { headers: { ...getAuthHeaders() } }
       )
 
       if (!response.ok) {
@@ -59,15 +50,12 @@ export function useSessions(): UseSessionsReturn {
 
   const createSession = useCallback(async (title?: string): Promise<string | null> => {
     try {
-      const userId = getUserId()
-      if (!userId) return null
-
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/sessions/`,
+        `${process.env.NEXT_PUBLIC_API_URL}/sessions/?user_id=shared-app-user`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_id: userId, title: title || 'New Chat' })
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: title || 'New Chat', user_id: 'shared-app-user' })
         }
       )
 
@@ -91,7 +79,7 @@ export function useSessions(): UseSessionsReturn {
     try {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/sessions/${sessionId}`,
-        { method: 'DELETE' }
+        { method: 'DELETE', headers: { ...getAuthHeaders() } }
       )
 
       if (!response.ok) {

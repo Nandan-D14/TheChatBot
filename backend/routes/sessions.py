@@ -4,9 +4,10 @@ Session routes for chat session management
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import Dict, List, Optional
 from datetime import datetime
 
+from core.auth import get_current_user
 from services.appwrite_service import get_appwrite_service, AppwriteService, AppwritePersistenceError
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
@@ -14,7 +15,6 @@ router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 class CreateSessionRequest(BaseModel):
     """Request to create a new session"""
-    user_id: str
     title: Optional[str] = "New Chat"
 
 
@@ -36,9 +36,25 @@ def get_db() -> AppwriteService:
     return get_appwrite_service()
 
 
+def _require_session_ownership(
+    session_id: str,
+    user_id: str,
+    db: AppwriteService,
+) -> Dict:
+    session = db.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    if session.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    return session
+
+
 @router.post("/", response_model=SessionResponse, status_code=201)
 async def create_session(
     request: CreateSessionRequest,
+    current_user: dict = Depends(get_current_user),
     db: AppwriteService = Depends(get_db)
 ):
     """
@@ -48,7 +64,7 @@ async def create_session(
     """
     try:
         result = db.create_session_record(
-            user_id=request.user_id,
+            user_id=current_user["user_id"],
             title=request.title or "New Chat"
         )
         
@@ -66,7 +82,7 @@ async def create_session(
 
 @router.get("/", response_model=List[SessionResponse])
 async def get_sessions(
-    user_id: str,
+    current_user: dict = Depends(get_current_user),
     db: AppwriteService = Depends(get_db)
 ):
     """
@@ -75,7 +91,7 @@ async def get_sessions(
     Returns list of sessions sorted by creation date (newest first)
     """
     try:
-        sessions = db.get_sessions(user_id)
+        sessions = db.get_sessions(current_user["user_id"])
         
         return [
             SessionResponse(
@@ -95,16 +111,14 @@ async def get_sessions(
 @router.get("/{session_id}", response_model=SessionResponse)
 async def get_session(
     session_id: str,
+    current_user: dict = Depends(get_current_user),
     db: AppwriteService = Depends(get_db)
 ):
     """
     Get a specific session by ID
     """
     try:
-        session = db.get_session(session_id)
-        
-        if not session:
-            raise HTTPException(status_code=404, detail="Session not found")
+        session = _require_session_ownership(session_id, current_user["user_id"], db)
         
         return SessionResponse(
             session_id=session.get("session_id", ""),
@@ -124,12 +138,15 @@ async def get_session(
 async def update_session(
     session_id: str,
     request: UpdateSessionRequest,
+    current_user: dict = Depends(get_current_user),
     db: AppwriteService = Depends(get_db)
 ):
     """
     Update a session (e.g., change title)
     """
     try:
+        _require_session_ownership(session_id, current_user["user_id"], db)
+
         if request.title:
             result = db.update_session_title(session_id, request.title)
         else:
@@ -155,12 +172,14 @@ async def update_session(
 @router.delete("/{session_id}")
 async def delete_session(
     session_id: str,
+    current_user: dict = Depends(get_current_user),
     db: AppwriteService = Depends(get_db)
 ):
     """
     Delete a session and all its messages
     """
     try:
+        _require_session_ownership(session_id, current_user["user_id"], db)
         db.delete_session_record(session_id)
         return {"status": "deleted", "session_id": session_id}
     except AppwritePersistenceError as e:
@@ -172,12 +191,14 @@ async def delete_session(
 @router.get("/{session_id}/messages")
 async def get_session_messages(
     session_id: str,
+    current_user: dict = Depends(get_current_user),
     db: AppwriteService = Depends(get_db)
 ):
     """
     Get all messages for a session
     """
     try:
+        _require_session_ownership(session_id, current_user["user_id"], db)
         messages = db.get_messages(session_id)
         
         return {

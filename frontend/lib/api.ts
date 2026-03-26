@@ -2,6 +2,8 @@
  * API helper functions for communicating with the backend
  */
 
+import { getAuthHeaders } from './userIdentity'
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 export interface ChatMessage {
@@ -28,7 +30,7 @@ export interface Session {
 export async function* streamChat(request: ChatRequest) {
   const response = await fetch(`${API_URL}/chat/stream`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify(request)
   })
 
@@ -71,7 +73,7 @@ export async function* streamChat(request: ChatRequest) {
 export async function sendChat(request: ChatRequest): Promise<string> {
   const response = await fetch(`${API_URL}/chat/non-stream`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify(request)
   })
 
@@ -86,11 +88,11 @@ export async function sendChat(request: ChatRequest): Promise<string> {
 /**
  * Create a new session
  */
-export async function createSession(userId: string, title?: string): Promise<Session> {
+export async function createSession(title?: string): Promise<Session> {
   const response = await fetch(`${API_URL}/sessions/`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id: userId, title: title || 'New Chat' })
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: title || 'New Chat', user_id: 'shared-app-user' })
   })
 
   if (!response.ok) {
@@ -103,8 +105,10 @@ export async function createSession(userId: string, title?: string): Promise<Ses
 /**
  * Get all sessions for a user
  */
-export async function getSessions(userId: string): Promise<Session[]> {
-  const response = await fetch(`${API_URL}/sessions/?user_id=${userId}`)
+export async function getSessions(): Promise<Session[]> {
+  const response = await fetch(`${API_URL}/sessions/?user_id=shared-app-user`, {
+    headers: { ...getAuthHeaders() }
+  })
 
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`)
@@ -118,7 +122,8 @@ export async function getSessions(userId: string): Promise<Session[]> {
  */
 export async function deleteSession(sessionId: string): Promise<void> {
   const response = await fetch(`${API_URL}/sessions/${sessionId}`, {
-    method: 'DELETE'
+    method: 'DELETE',
+    headers: { ...getAuthHeaders() }
   })
 
   if (!response.ok) {
@@ -130,7 +135,9 @@ export async function deleteSession(sessionId: string): Promise<void> {
  * Get messages for a session
  */
 export async function getSessionMessages(sessionId: string): Promise<ChatMessage[]> {
-  const response = await fetch(`${API_URL}/sessions/${sessionId}/messages`)
+  const response = await fetch(`${API_URL}/sessions/${sessionId}/messages`, {
+    headers: { ...getAuthHeaders() }
+  })
 
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`)
@@ -142,3 +149,4 @@ export async function getSessionMessages(sessionId: string): Promise<ChatMessage
     content: m.content
   }))
 }
+
