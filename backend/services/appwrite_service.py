@@ -6,6 +6,8 @@ Handles users, sessions, messages, and memory storage
 from typing import List, Dict, Optional
 import logging
 import uuid
+import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from datetime import datetime, timezone
 from core.config import settings
 
@@ -40,6 +42,7 @@ class AppwriteService:
             from appwrite.client import Client
             from appwrite.services.databases import Databases
             from appwrite.services.users import Users
+            from appwrite.services.account import Account
 
             self.client = Client()
             # Use settings from config.py which loads .env file
@@ -53,6 +56,12 @@ class AppwriteService:
             self.memory_collection_id = settings.appwrite_memory_collection_id
             self.databases = Databases(self.client)
             self.users = Users(self.client)
+            self._account_service_cls = Account
+            self._client_cls = Client
+            self._operation_timeout_s = int(getattr(settings, "appwrite_operation_timeout_s", 20) or 20)
+            self._max_retries = int(getattr(settings, "appwrite_max_retries", 2) or 2)
+            self._retry_backoff_s = float(getattr(settings, "appwrite_retry_backoff_s", 0.4) or 0.4)
+            self._executor = ThreadPoolExecutor(max_workers=8, thread_name_prefix="appwrite-ops")
 
             self._initialized = True
 
@@ -68,6 +77,40 @@ class AppwriteService:
         if not self._initialized:
             raise AppwritePersistenceError("Appwrite is not initialized")
 
+    def _call_with_retry(self, operation_name: str, func, *args, **kwargs):
+        """Execute an Appwrite SDK call with timeout and bounded retries."""
+        self._check_initialized()
+
+        attempts = self._max_retries + 1
+        last_error: Optional[Exception] = None
+
+        for attempt in range(1, attempts + 1):
+            future = self._executor.submit(func, *args, **kwargs)
+            try:
+                return future.result(timeout=self._operation_timeout_s)
+            except FuturesTimeoutError as e:
+                future.cancel()
+                last_error = AppwritePersistenceError(
+                    f"{operation_name} timed out after {self._operation_timeout_s}s"
+                )
+                logger.warning(
+                    "Appwrite operation timeout",
+                    extra={"operation": operation_name, "attempt": attempt, "attempts": attempts}
+                )
+            except Exception as e:
+                last_error = e
+                logger.warning(
+                    "Appwrite operation failed",
+                    extra={"operation": operation_name, "attempt": attempt, "attempts": attempts, "error": str(e)}
+                )
+
+            if attempt < attempts:
+                time.sleep(self._retry_backoff_s * (2 ** (attempt - 1)))
+
+        raise AppwritePersistenceError(
+            f"{operation_name} failed after {attempts} attempt(s): {last_error}"
+        )
+
     def verify_ready(self) -> Dict[str, bool]:
         """Verify Appwrite database and required collections are reachable."""
         self._check_initialized()
@@ -80,7 +123,12 @@ class AppwriteService:
         for collection_id in readiness:
             try:
                 # A simple list call validates API key, DB id, and collection id.
-                self.databases.list_documents(self.database_id, collection_id)
+                self._call_with_retry(
+                    "verify_ready.list_documents",
+                    self.databases.list_documents,
+                    self.database_id,
+                    collection_id,
+                )
                 readiness[collection_id] = True
             except Exception as e:
                 logger.error(
@@ -94,11 +142,84 @@ class AppwriteService:
         return readiness
     
     # ==================== User Methods ====================
+
+    def _build_public_client(self):
+        client = self._client_cls()
+        client.set_endpoint(settings.appwrite_endpoint)
+        client.set_project(settings.appwrite_project_id)
+        return client
+
+    def create_user_account(self, email: str, password: str, name: Optional[str] = None) -> Dict:
+        """Create an Appwrite user account via server-side Users API."""
+        self._check_initialized()
+        try:
+            return self._call_with_retry(
+                "create_user_account.users_create",
+                self.users.create,
+                "unique()",
+                email=email,
+                password=password,
+                name=name,
+            )
+        except Exception as e:
+            raise AppwritePersistenceError(f"Failed to create user: {e}") from e
+
+    def create_email_password_session(self, email: str, password: str) -> Dict:
+        """Create an email/password session using public Account API."""
+        self._check_initialized()
+        try:
+            account = self._account_service_cls(self._build_public_client())
+            return self._call_with_retry(
+                "create_email_password_session.account_create",
+                account.create_email_password_session,
+                email,
+                password,
+            )
+        except Exception as e:
+            raise AppwritePersistenceError(f"Failed to create login session: {e}") from e
+
+    def create_user_jwt(self, user_id: str, session_id: Optional[str] = None) -> Dict:
+        """Create JWT for a user (optionally tied to a session)."""
+        self._check_initialized()
+        try:
+            return self._call_with_retry(
+                "create_user_jwt.users_create_jwt",
+                self.users.create_jwt,
+                user_id,
+                session_id=session_id,
+            )
+        except Exception as e:
+            raise AppwritePersistenceError(f"Failed to create auth token: {e}") from e
+
+    def verify_jwt(self, jwt: str) -> Dict:
+        """Validate JWT and return Appwrite account payload."""
+        self._check_initialized()
+        try:
+            client = self._build_public_client()
+            client.set_jwt(jwt)
+            account = self._account_service_cls(client)
+            return self._call_with_retry(
+                "verify_jwt.account_get",
+                account.get,
+            )
+        except Exception as e:
+            raise AppwritePersistenceError(f"Failed to verify token: {e}") from e
+
+    def delete_user_sessions(self, user_id: str):
+        """Delete all active sessions for a user."""
+        self._check_initialized()
+        try:
+            return self._call_with_retry(
+                "delete_user_sessions.users_delete_sessions",
+                self.users.delete_sessions,
+                user_id,
+            )
+        except Exception as e:
+            raise AppwritePersistenceError(f"Failed to delete sessions: {e}") from e
     
     def create_user(self, email: str, password: str) -> Dict:
         """Create a new user"""
-        self._check_initialized()
-        return self.users.create(email, password)
+        return self.create_user_account(email, password)
     
     def get_user(self, user_id: str) -> Dict:
         """Get user by ID"""
@@ -145,16 +266,18 @@ class AppwriteService:
         created_at = _utc_iso_timestamp()
         
         try:
-            return self.databases.create_document(
+            return self._call_with_retry(
+                "create_session_record.create_document",
+                self.databases.create_document,
                 self.database_id,
-                    self.sessions_collection_id,
+                self.sessions_collection_id,
                 session_id,
                 {
                     "session_id": session_id,
                     "user_id": user_id,
                     "title": title,
-                    "created_at": created_at
-                }
+                    "created_at": created_at,
+                },
             )
         except Exception as e:
             logger.exception(
@@ -170,13 +293,15 @@ class AppwriteService:
         try:
             from appwrite.query import Query
 
-            result = self.databases.list_documents(
+            result = self._call_with_retry(
+                "get_sessions.list_documents",
+                self.databases.list_documents,
                 self.database_id,
-                    self.sessions_collection_id,
+                self.sessions_collection_id,
                 queries=[
                     Query.equal("user_id", user_id),
-                    Query.order_desc("created_at")
-                ]
+                    Query.order_desc("created_at"),
+                ],
             )
             return result.get("documents", [])
         except Exception as e:
@@ -191,10 +316,12 @@ class AppwriteService:
         self._check_initialized()
         
         try:
-            return self.databases.get_document(
+            return self._call_with_retry(
+                "get_session.get_document",
+                self.databases.get_document,
                 self.database_id,
-                    self.sessions_collection_id,
-                session_id
+                self.sessions_collection_id,
+                session_id,
             )
         except Exception as e:
             logger.warning(
@@ -207,11 +334,13 @@ class AppwriteService:
         """Update session title"""
         self._check_initialized()
         
-        return self.databases.update_document(
+        return self._call_with_retry(
+            "update_session_title.update_document",
+            self.databases.update_document,
             self.database_id,
-                self.sessions_collection_id,
+            self.sessions_collection_id,
             session_id,
-            {"title": title}
+            {"title": title},
         )
     
     def delete_session_record(self, session_id: str):
@@ -222,19 +351,26 @@ class AppwriteService:
         messages = self.get_messages(session_id)
         for msg in messages:
             try:
-                self.databases.delete_document(
+                self._call_with_retry(
+                    "delete_session_record.delete_message",
+                    self.databases.delete_document,
                     self.database_id,
-                        self.messages_collection_id,
-                    msg["message_id"]
+                    self.messages_collection_id,
+                    msg["message_id"],
                 )
-            except:
-                pass
+            except Exception as e:
+                logger.warning(
+                    "Failed to delete message during session cleanup",
+                    extra={"session_id": session_id, "message_id": msg.get("message_id", ""), "error": str(e)}
+                )
         
         # Delete the session
-        return self.databases.delete_document(
+        return self._call_with_retry(
+            "delete_session_record.delete_session",
+            self.databases.delete_document,
             self.database_id,
-                self.sessions_collection_id,
-            session_id
+            self.sessions_collection_id,
+            session_id,
         )
     
     # ==================== Message Methods ====================
@@ -252,17 +388,19 @@ class AppwriteService:
         created_at = _utc_iso_timestamp()
         
         try:
-            return self.databases.create_document(
+            return self._call_with_retry(
+                "save_message.create_document",
+                self.databases.create_document,
                 self.database_id,
-                    self.messages_collection_id,
+                self.messages_collection_id,
                 message_id,
                 {
                     "message_id": message_id,
                     "session_id": session_id,
                     "role": role,
                     "content": content,
-                    "created_at": created_at
-                }
+                    "created_at": created_at,
+                },
             )
         except Exception as e:
             logger.exception(
@@ -278,13 +416,15 @@ class AppwriteService:
         try:
             from appwrite.query import Query
 
-            result = self.databases.list_documents(
+            result = self._call_with_retry(
+                "get_messages.list_documents",
+                self.databases.list_documents,
                 self.database_id,
-                    self.messages_collection_id,
+                self.messages_collection_id,
                 queries=[
                     Query.equal("session_id", session_id),
-                    Query.order_asc("created_at")
-                ]
+                    Query.order_asc("created_at"),
+                ],
             )
             return result.get("documents", [])
         except Exception as e:
@@ -300,10 +440,12 @@ class AppwriteService:
         
         from appwrite.query import Query
 
-        result = self.databases.list_documents(
+        result = self._call_with_retry(
+            "get_message_count.list_documents",
+            self.databases.list_documents,
             self.database_id,
             self.messages_collection_id,
-            queries=[Query.equal("session_id", session_id)]
+            queries=[Query.equal("session_id", session_id)],
         )
         
         return result.get("total", 0)
@@ -317,10 +459,12 @@ class AppwriteService:
         from appwrite.query import Query
 
         # Check if memory exists
-        result = self.databases.list_documents(
+        result = self._call_with_retry(
+            "save_memory.list_documents",
+            self.databases.list_documents,
             self.database_id,
-                self.memory_collection_id,
-            queries=[Query.equal("user_id", user_id)]
+            self.memory_collection_id,
+            queries=[Query.equal("user_id", user_id)],
         )
         
         updated_at = _utc_iso_timestamp()
@@ -328,24 +472,28 @@ class AppwriteService:
         if result["total"] > 0:
             # Update existing
             doc_id = result["documents"][0]["$id"]
-            self.databases.update_document(
+            self._call_with_retry(
+                "save_memory.update_document",
+                self.databases.update_document,
                 self.database_id,
-                    self.memory_collection_id,
+                self.memory_collection_id,
                 doc_id,
-                {"summary": summary, "updated_at": updated_at}
+                {"summary": summary, "updated_at": updated_at},
             )
         else:
             # Create new
             doc_id = str(uuid.uuid4())
-            self.databases.create_document(
+            self._call_with_retry(
+                "save_memory.create_document",
+                self.databases.create_document,
                 self.database_id,
-                    self.memory_collection_id,
+                self.memory_collection_id,
                 doc_id,
                 {
                     "user_id": user_id,
                     "summary": summary,
-                    "updated_at": updated_at
-                }
+                    "updated_at": updated_at,
+                },
             )
     
     def get_memory(self, user_id: str) -> Optional[str]:
@@ -354,10 +502,12 @@ class AppwriteService:
         
         from appwrite.query import Query
 
-        result = self.databases.list_documents(
+        result = self._call_with_retry(
+            "get_memory.list_documents",
+            self.databases.list_documents,
             self.database_id,
-                self.memory_collection_id,
-            queries=[Query.equal("user_id", user_id)]
+            self.memory_collection_id,
+            queries=[Query.equal("user_id", user_id)],
         )
         
         if result["total"] > 0:
@@ -370,18 +520,22 @@ class AppwriteService:
         
         from appwrite.query import Query
 
-        result = self.databases.list_documents(
+        result = self._call_with_retry(
+            "delete_memory.list_documents",
+            self.databases.list_documents,
             self.database_id,
-                self.memory_collection_id,
-            queries=[Query.equal("user_id", user_id)]
+            self.memory_collection_id,
+            queries=[Query.equal("user_id", user_id)],
         )
         
         if result["total"] > 0:
             for doc in result["documents"]:
-                self.databases.delete_document(
+                self._call_with_retry(
+                    "delete_memory.delete_document",
+                    self.databases.delete_document,
                     self.database_id,
-                        self.memory_collection_id,
-                    doc["$id"]
+                    self.memory_collection_id,
+                    doc["$id"],
                 )
 
 

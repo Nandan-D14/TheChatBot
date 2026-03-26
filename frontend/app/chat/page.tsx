@@ -1,154 +1,51 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Sidebar } from '@/components/sidebar/Sidebar'
 import { ChatWindow } from '@/components/chat/ChatWindow'
-import { AlertCircle, X } from 'lucide-react'
-import { ensureTempUserIdSafe, getUserIdSafe } from '@/lib/userIdentity'
-
-
-const REQUEST_TIMEOUT_MS = 25000
+import { hasValidAccessKey } from '@/lib/userIdentity'
 
 export default function ChatPage() {
-  const [sessionId, setSessionId] = useState<string | null>(null)
-  const [sessionError, setSessionError] = useState<string | null>(null)
-  const [isCreatingSession, setIsCreatingSession] = useState(true)
   const router = useRouter()
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
 
   useEffect(() => {
-    // Ensure a usable identity even when localStorage is restricted.
-    ensureTempUserIdSafe()
-
-    // Create a new session if none exists
-    createNewSession()
-  }, [])
-
-  const createNewSession = async () => {
-    setSessionError(null)
-    setIsCreatingSession(true)
-
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort('request-timeout'), REQUEST_TIMEOUT_MS)
-
-    try {
-      const userId = getUserIdSafe()
-
-      if (!userId) {
-        throw new Error('User not authenticated. Please refresh the page.')
-      }
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/sessions/`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_id: userId }),
-          signal: controller.signal
-        }
-      )
-
-      clearTimeout(timeoutId)
-
-      if (!response.ok) {
-        let detail = `${response.status} ${response.statusText}`
-        try {
-          const body = await response.json()
-          if (body?.detail) {
-            detail = body.detail
-          }
-        } catch {
-          // Keep fallback detail when response body is not JSON.
-        }
-        throw new Error(`Session creation failed: ${detail}`)
-      }
-
-      const data = await response.json()
-      setSessionId(data.session_id)
-    } catch (error: any) {
-      clearTimeout(timeoutId)
-
-      if (error.name === 'AbortError') {
-        setSessionError('Request timed out. Please check your connection and try again.')
-      } else if (error.message) {
-        setSessionError(error.message)
-      } else {
-        setSessionError('Failed to create session. Please try again.')
-      }
-
-      console.error('Failed to create session:', error)
-
-      // Fallback for demo purposes - still allow user to proceed
-      // But only if no serious error (like domain not configured)
-      if (!error.name || error.name !== 'TypeError') {
-        setSessionId('demo_session')
-      }
-    } finally {
-      setIsCreatingSession(false)
+    if (!hasValidAccessKey()) {
+      router.replace('/login')
     }
-  }
-
-  const handleSessionChange = (newSessionId: string) => {
-    setSessionId(newSessionId)
-    router.push(`/chat/${newSessionId}`)
-  }
-
-  if (!sessionId) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center max-w-md mx-auto p-6">
-          {isCreatingSession ? (
-            <>
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-              <p className="mt-4 text-muted-foreground">Creating your chat session...</p>
-            </>
-          ) : sessionError ? (
-            <div className="space-y-4">
-              <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
-                  <div className="text-left">
-                    <h3 className="font-semibold text-red-800 dark:text-red-200 mb-1">Failed to create session</h3>
-                    <p className="text-sm text-red-600 dark:text-red-300">{sessionError}</p>
-                  </div>
-                </div>
-              </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                You can continue in demo mode, but chats won't be saved.
-              </p>
-              <button
-                onClick={() => setSessionId('demo_session')}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Continue in Demo Mode
-              </button>
-            </div>
-          ) : (
-            <p className="text-muted-foreground">Preparing chat...</p>
-          )}
-        </div>
-      </div>
-    )
-  }
+    
+    // Auto-close sidebar on mobile by default
+    if (window.innerWidth < 768) {
+      setIsSidebarOpen(false)
+    }
+  }, [router])
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-[100dvh] bg-[#0a0a0a] text-zinc-100 overflow-hidden">
+      {/* Mobile Overlay */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 z-40 md:hidden transition-opacity"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <div className="w-64 flex-shrink-0">
-        <Sidebar onSessionChange={handleSessionChange} />
+      <div 
+        className={`
+          fixed inset-y-0 left-0 z-50 w-72 flex-shrink-0
+          transform transition-all duration-300 ease-in-out
+          md:relative
+          ${isSidebarOpen ? 'translate-x-0 md:ml-0' : '-translate-x-full md:-ml-72'}
+        `}
+      >
+        <Sidebar onClose={() => setIsSidebarOpen(false)} />
       </div>
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
-        {sessionId === 'demo_session' && (
-          <div className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 px-4 py-2">
-            <div className="flex items-center justify-center gap-2 text-sm text-amber-800 dark:text-amber-200">
-              <AlertCircle size={16} />
-              <span>Demo Mode: Chats are not saved. Connect backend to enable full functionality.</span>
-            </div>
-          </div>
-        )}
-        <ChatWindow sessionId={sessionId} />
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col relative w-full min-w-0">
+        <ChatWindow isSidebarOpen={isSidebarOpen} onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
       </div>
     </div>
   )

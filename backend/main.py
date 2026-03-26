@@ -4,7 +4,8 @@ TheChatBot API - FastAPI Backend Entry Point
 A private ChatGPT-like API powered by Beam Cloud Qwen3.5-9B LLM
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
@@ -52,6 +53,23 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+
+@app.middleware("http")
+async def enforce_app_access_key(request: Request, call_next):
+    """Require x-app-access-key header for all non-health API requests."""
+    if request.method == "OPTIONS" or request.url.path == "/health":
+        return await call_next(request)
+
+    provided_key = request.headers.get("x-app-access-key", "").strip()
+    expected_key = settings.app_access_key.strip()
+    if not expected_key or provided_key != expected_key:
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "Invalid or missing app access key."},
+        )
+
+    return await call_next(request)
+
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
@@ -98,6 +116,7 @@ async def info():
         "beam_endpoint_configured": bool(settings.beam_endpoint_url and settings.beam_endpoint_url != "https://your-app.beam.cloud"),
         "appwrite_configured": bool(settings.appwrite_project_id and settings.appwrite_project_id != "your_project_id"),
         "appwrite_db_id_configured": bool(settings.appwrite_db_id and settings.appwrite_db_id != "chatbot_db"),
+        "app_access_key_configured": bool(settings.app_access_key),
     }
 
 
