@@ -51,7 +51,16 @@ export default function ChatPage() {
       clearTimeout(timeoutId)
 
       if (!response.ok) {
-        throw new Error(`Session creation failed: ${response.status} ${response.statusText}`)
+        let detail = `${response.status} ${response.statusText}`
+        try {
+          const body = await response.json()
+          if (body?.detail) {
+            detail = body.detail
+          }
+        } catch {
+          // Keep fallback detail when response body is not JSON.
+        }
+        throw new Error(`Session creation failed: ${detail}`)
       }
 
       const data = await response.json()

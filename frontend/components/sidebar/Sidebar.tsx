@@ -50,7 +50,16 @@ export function Sidebar({ onSessionChange }: SidebarProps) {
       clearTimeout(timeoutId)
 
       if (!response.ok) {
-        throw new Error(`Failed to load sessions: ${response.status} ${response.statusText}`)
+        let detail = `${response.status} ${response.statusText}`
+        try {
+          const body = await response.json()
+          if (body?.detail) {
+            detail = body.detail
+          }
+        } catch {
+          // Keep fallback detail when response body is not JSON.
+        }
+        throw new Error(`Failed to load sessions: ${detail}`)
       }
 
       const data = await response.json()
@@ -102,7 +111,16 @@ export function Sidebar({ onSessionChange }: SidebarProps) {
       clearTimeout(timeoutId)
 
       if (!response.ok) {
-        throw new Error(`Failed to create chat: ${response.status} ${response.statusText}`)
+        let detail = `${response.status} ${response.statusText}`
+        try {
+          const body = await response.json()
+          if (body?.detail) {
+            detail = body.detail
+          }
+        } catch {
+          // Keep fallback detail when response body is not JSON.
+        }
+        throw new Error(`Failed to create chat: ${detail}`)
       }
 
       const newSession = await response.json()
