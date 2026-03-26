@@ -48,6 +48,9 @@ class AppwriteService:
             self.client.set_key(settings.appwrite_api_key)
 
             self.database_id = settings.appwrite_db_id
+            self.sessions_collection_id = settings.appwrite_sessions_collection_id
+            self.messages_collection_id = settings.appwrite_messages_collection_id
+            self.memory_collection_id = settings.appwrite_memory_collection_id
             self.databases = Databases(self.client)
             self.users = Users(self.client)
 
@@ -69,7 +72,11 @@ class AppwriteService:
         """Verify Appwrite database and required collections are reachable."""
         self._check_initialized()
 
-        readiness = {"sessions": False, "messages": False, "memory": False}
+        readiness = {
+            self.sessions_collection_id: False,
+            self.messages_collection_id: False,
+            self.memory_collection_id: False,
+        }
         for collection_id in readiness:
             try:
                 # A simple list call validates API key, DB id, and collection id.
@@ -140,7 +147,7 @@ class AppwriteService:
         try:
             return self.databases.create_document(
                 self.database_id,
-                "sessions",
+                    self.sessions_collection_id,
                 session_id,
                 {
                     "session_id": session_id,
@@ -152,7 +159,7 @@ class AppwriteService:
         except Exception as e:
             logger.exception(
                 "Appwrite create_session_record failed",
-                extra={"database_id": self.database_id, "collection_id": "sessions", "user_id": user_id}
+                extra={"database_id": self.database_id, "collection_id": self.sessions_collection_id, "user_id": user_id}
             )
             raise AppwritePersistenceError(f"Failed to create session record: {e}") from e
     
@@ -165,7 +172,7 @@ class AppwriteService:
 
             result = self.databases.list_documents(
                 self.database_id,
-                "sessions",
+                    self.sessions_collection_id,
                 queries=[
                     Query.equal("user_id", user_id),
                     Query.order_desc("created_at")
@@ -175,7 +182,7 @@ class AppwriteService:
         except Exception as e:
             logger.exception(
                 "Appwrite get_sessions failed",
-                extra={"database_id": self.database_id, "collection_id": "sessions", "user_id": user_id}
+                extra={"database_id": self.database_id, "collection_id": self.sessions_collection_id, "user_id": user_id}
             )
             raise AppwritePersistenceError(f"Failed to fetch sessions: {e}") from e
     
@@ -186,13 +193,13 @@ class AppwriteService:
         try:
             return self.databases.get_document(
                 self.database_id,
-                "sessions",
+                    self.sessions_collection_id,
                 session_id
             )
         except Exception as e:
             logger.warning(
                 "Appwrite get_session failed",
-                extra={"database_id": self.database_id, "collection_id": "sessions", "session_id": session_id, "error": str(e)}
+                extra={"database_id": self.database_id, "collection_id": self.sessions_collection_id, "session_id": session_id, "error": str(e)}
             )
             return None
     
@@ -202,7 +209,7 @@ class AppwriteService:
         
         return self.databases.update_document(
             self.database_id,
-            "sessions",
+                self.sessions_collection_id,
             session_id,
             {"title": title}
         )
@@ -217,7 +224,7 @@ class AppwriteService:
             try:
                 self.databases.delete_document(
                     self.database_id,
-                    "messages",
+                        self.messages_collection_id,
                     msg["message_id"]
                 )
             except:
@@ -226,7 +233,7 @@ class AppwriteService:
         # Delete the session
         return self.databases.delete_document(
             self.database_id,
-            "sessions",
+                self.sessions_collection_id,
             session_id
         )
     
@@ -247,7 +254,7 @@ class AppwriteService:
         try:
             return self.databases.create_document(
                 self.database_id,
-                "messages",
+                    self.messages_collection_id,
                 message_id,
                 {
                     "message_id": message_id,
@@ -260,7 +267,7 @@ class AppwriteService:
         except Exception as e:
             logger.exception(
                 "Appwrite save_message failed",
-                extra={"database_id": self.database_id, "collection_id": "messages", "session_id": session_id, "role": role}
+                extra={"database_id": self.database_id, "collection_id": self.messages_collection_id, "session_id": session_id, "role": role}
             )
             raise AppwritePersistenceError(f"Failed to save message: {e}") from e
     
@@ -273,7 +280,7 @@ class AppwriteService:
 
             result = self.databases.list_documents(
                 self.database_id,
-                "messages",
+                    self.messages_collection_id,
                 queries=[
                     Query.equal("session_id", session_id),
                     Query.order_asc("created_at")
@@ -283,7 +290,7 @@ class AppwriteService:
         except Exception as e:
             logger.exception(
                 "Appwrite get_messages failed",
-                extra={"database_id": self.database_id, "collection_id": "messages", "session_id": session_id}
+                extra={"database_id": self.database_id, "collection_id": self.messages_collection_id, "session_id": session_id}
             )
             raise AppwritePersistenceError(f"Failed to fetch messages: {e}") from e
     
@@ -295,7 +302,7 @@ class AppwriteService:
 
         result = self.databases.list_documents(
             self.database_id,
-            "messages",
+            self.messages_collection_id,
             queries=[Query.equal("session_id", session_id)]
         )
         
@@ -312,7 +319,7 @@ class AppwriteService:
         # Check if memory exists
         result = self.databases.list_documents(
             self.database_id,
-            "memory",
+                self.memory_collection_id,
             queries=[Query.equal("user_id", user_id)]
         )
         
@@ -323,7 +330,7 @@ class AppwriteService:
             doc_id = result["documents"][0]["$id"]
             self.databases.update_document(
                 self.database_id,
-                "memory",
+                    self.memory_collection_id,
                 doc_id,
                 {"summary": summary, "updated_at": updated_at}
             )
@@ -332,7 +339,7 @@ class AppwriteService:
             doc_id = str(uuid.uuid4())
             self.databases.create_document(
                 self.database_id,
-                "memory",
+                    self.memory_collection_id,
                 doc_id,
                 {
                     "user_id": user_id,
@@ -349,7 +356,7 @@ class AppwriteService:
 
         result = self.databases.list_documents(
             self.database_id,
-            "memory",
+                self.memory_collection_id,
             queries=[Query.equal("user_id", user_id)]
         )
         
@@ -365,7 +372,7 @@ class AppwriteService:
 
         result = self.databases.list_documents(
             self.database_id,
-            "memory",
+                self.memory_collection_id,
             queries=[Query.equal("user_id", user_id)]
         )
         
@@ -373,7 +380,7 @@ class AppwriteService:
             for doc in result["documents"]:
                 self.databases.delete_document(
                     self.database_id,
-                    "memory",
+                        self.memory_collection_id,
                     doc["$id"]
                 )
 
