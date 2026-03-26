@@ -6,7 +6,7 @@ Handles users, sessions, messages, and memory storage
 from typing import List, Dict, Optional
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from core.config import settings
 
 
@@ -15,6 +15,11 @@ logger = logging.getLogger(__name__)
 
 class AppwritePersistenceError(Exception):
     """Raised when Appwrite persistence operations fail."""
+
+
+def _utc_iso_timestamp() -> str:
+    """Return an Appwrite-compatible UTC timestamp string."""
+    return datetime.now(timezone.utc).isoformat()
 
 
 class AppwriteService:
@@ -130,7 +135,7 @@ class AppwriteService:
         self._check_initialized()
         
         session_id = str(uuid.uuid4())
-        created_at = datetime.utcnow().isoformat()
+        created_at = _utc_iso_timestamp()
         
         try:
             return self.databases.create_document(
@@ -156,12 +161,14 @@ class AppwriteService:
         self._check_initialized()
         
         try:
+            from appwrite.query import Query
+
             result = self.databases.list_documents(
                 self.database_id,
                 "sessions",
                 queries=[
-                    f'equal("user_id", "{user_id}")',
-                    'orderBy("created_at", "DESC")'
+                    Query.equal("user_id", user_id),
+                    Query.order_desc("created_at")
                 ]
             )
             return result.get("documents", [])
@@ -235,7 +242,7 @@ class AppwriteService:
         self._check_initialized()
         
         message_id = str(uuid.uuid4())
-        created_at = datetime.utcnow().isoformat()
+        created_at = _utc_iso_timestamp()
         
         try:
             return self.databases.create_document(
@@ -262,12 +269,14 @@ class AppwriteService:
         self._check_initialized()
         
         try:
+            from appwrite.query import Query
+
             result = self.databases.list_documents(
                 self.database_id,
                 "messages",
                 queries=[
-                    f'equal("session_id", "{session_id}")',
-                    'orderBy("created_at", "ASC")'
+                    Query.equal("session_id", session_id),
+                    Query.order_asc("created_at")
                 ]
             )
             return result.get("documents", [])
@@ -282,10 +291,12 @@ class AppwriteService:
         """Get message count for a session"""
         self._check_initialized()
         
+        from appwrite.query import Query
+
         result = self.databases.list_documents(
             self.database_id,
             "messages",
-            queries=[f'equal("session_id", "{session_id}")']
+            queries=[Query.equal("session_id", session_id)]
         )
         
         return result.get("total", 0)
@@ -296,14 +307,16 @@ class AppwriteService:
         """Save user-level memory summary"""
         self._check_initialized()
         
+        from appwrite.query import Query
+
         # Check if memory exists
         result = self.databases.list_documents(
             self.database_id,
             "memory",
-            queries=[f'equal("user_id", "{user_id}")']
+            queries=[Query.equal("user_id", user_id)]
         )
         
-        updated_at = datetime.utcnow().isoformat()
+        updated_at = _utc_iso_timestamp()
         
         if result["total"] > 0:
             # Update existing
@@ -332,10 +345,12 @@ class AppwriteService:
         """Get user-level memory summary"""
         self._check_initialized()
         
+        from appwrite.query import Query
+
         result = self.databases.list_documents(
             self.database_id,
             "memory",
-            queries=[f'equal("user_id", "{user_id}")']
+            queries=[Query.equal("user_id", user_id)]
         )
         
         if result["total"] > 0:
@@ -346,10 +361,12 @@ class AppwriteService:
         """Delete user memory"""
         self._check_initialized()
         
+        from appwrite.query import Query
+
         result = self.databases.list_documents(
             self.database_id,
             "memory",
-            queries=[f'equal("user_id", "{user_id}")']
+            queries=[Query.equal("user_id", user_id)]
         )
         
         if result["total"] > 0:

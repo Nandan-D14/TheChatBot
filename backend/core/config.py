@@ -3,13 +3,19 @@ Configuration management for TheChatBot backend
 Uses pydantic-settings for environment variable management
 """
 
-from pydantic_settings import BaseSettings
-from pydantic import field_validator
-from typing import Optional, List
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import List
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False,
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
     
     # Beam Cloud Configuration
     beam_endpoint_url: str = "https://your-app.beam.cloud"
@@ -38,12 +44,6 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
         return self.cors_origins if isinstance(self.cors_origins, list) else ["http://localhost:3000"]
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
-        env_file_encoding = "utf-8"
-
-
 # Global settings instance
 settings = Settings()
 
