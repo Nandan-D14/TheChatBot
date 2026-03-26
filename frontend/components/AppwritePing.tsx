@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { client } from '@/lib/appwrite'
+import { getClient } from '@/lib/appwrite'
 
 export default function AppwritePing() {
   const [isMounted, setIsMounted] = useState(false)
@@ -10,7 +10,7 @@ export default function AppwritePing() {
     setIsMounted(true)
     
     // Ping Appwrite backend to verify setup
-    client.ping()
+    getClient().ping()
       .then(() => {
         console.log('✓ Appwrite backend connection verified')
       })

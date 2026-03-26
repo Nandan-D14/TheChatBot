@@ -2,16 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Sidebar } from '@/components/sidebar/Sidebar'
-import { ChatWindow } from '@/components/chat/ChatWindow'
-import { AlertCircle, X } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
 import { ensureTempUserIdSafe, getUserIdSafe } from '@/lib/userIdentity'
 
 
-const REQUEST_TIMEOUT_MS = 25000
+const REQUEST_TIMEOUT_MS = 60000
 
 export default function ChatPage() {
-  const [sessionId, setSessionId] = useState<string | null>(null)
   const [sessionError, setSessionError] = useState<string | null>(null)
   const [isCreatingSession, setIsCreatingSession] = useState(true)
   const router = useRouter()
@@ -64,7 +61,7 @@ export default function ChatPage() {
       }
 
       const data = await response.json()
-      setSessionId(data.session_id)
+      router.replace(`/chat/${data.session_id}`)
     } catch (error: any) {
       clearTimeout(timeoutId)
 
@@ -81,74 +78,42 @@ export default function ChatPage() {
       // Fallback for demo purposes - still allow user to proceed
       // But only if no serious error (like domain not configured)
       if (!error.name || error.name !== 'TypeError') {
-        setSessionId('demo_session')
+        router.replace('/chat/demo_session')
       }
     } finally {
       setIsCreatingSession(false)
     }
   }
 
-  const handleSessionChange = (newSessionId: string) => {
-    setSessionId(newSessionId)
-    router.push(`/chat/${newSessionId}`)
-  }
-
-  if (!sessionId) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center max-w-md mx-auto p-6">
-          {isCreatingSession ? (
-            <>
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-              <p className="mt-4 text-muted-foreground">Creating your chat session...</p>
-            </>
-          ) : sessionError ? (
-            <div className="space-y-4">
-              <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
-                  <div className="text-left">
-                    <h3 className="font-semibold text-red-800 dark:text-red-200 mb-1">Failed to create session</h3>
-                    <p className="text-sm text-red-600 dark:text-red-300">{sessionError}</p>
-                  </div>
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="text-center max-w-md mx-auto p-6">
+        {isCreatingSession ? (
+          <>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Creating your chat session...</p>
+          </>
+        ) : sessionError ? (
+          <div className="space-y-4">
+            <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
+                <div className="text-left">
+                  <h3 className="font-semibold text-red-800 dark:text-red-200 mb-1">Failed to create session</h3>
+                  <p className="text-sm text-red-600 dark:text-red-300">{sessionError}</p>
                 </div>
               </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                You can continue in demo mode, but chats won't be saved.
-              </p>
-              <button
-                onClick={() => setSessionId('demo_session')}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Continue in Demo Mode
-              </button>
             </div>
-          ) : (
-            <p className="text-muted-foreground">Preparing chat...</p>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex h-screen">
-      {/* Sidebar */}
-      <div className="w-64 flex-shrink-0">
-        <Sidebar onSessionChange={handleSessionChange} />
-      </div>
-
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
-        {sessionId === 'demo_session' && (
-          <div className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 px-4 py-2">
-            <div className="flex items-center justify-center gap-2 text-sm text-amber-800 dark:text-amber-200">
-              <AlertCircle size={16} />
-              <span>Demo Mode: Chats are not saved. Connect backend to enable full functionality.</span>
-            </div>
+            <button
+              onClick={createNewSession}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Retry
+            </button>
           </div>
+        ) : (
+          <p className="text-muted-foreground">Preparing chat...</p>
         )}
-        <ChatWindow sessionId={sessionId} />
       </div>
     </div>
   )
