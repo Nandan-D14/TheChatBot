@@ -35,6 +35,31 @@ jobs:
       - name: Run smoke tests
         run: pytest -q
 
+  backend-cf:
+    name: Backend-CF Typecheck
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: backend-cf
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: backend-cf/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
   frontend:
     name: Frontend Checks
     runs-on: ubuntu-latest

@@ -1,0 +1,30 @@
+name = "thechatbot-api"
+main = "src/index.ts"
+compatibility_date = "2025-03-03"
+compatibility_flags = ["nodejs_compat"]
+account_id = "315f00f715a05be42f2577e9936a95be"
+
+# Environment variables (set via wrangler secret for sensitive ones)
+[vars]
+APPWRITE_DB_ID = "chatbot_db"
+APPWRITE_SESSIONS_COLLECTION_ID = "sessions"
+APPWRITE_MESSAGES_COLLECTION_ID = "messages"
+APPWRITE_MEMORY_COLLECTION_ID = "memory"
+API_HOST = "0.0.0.0"
+API_PORT = "8000"
+APP_ACCESS_KEY = "PES2UG23CS363"
+APPWRITE_OPERATION_TIMEOUT_S = "20"
+APPWRITE_MAX_RETRIES = "2"
+APPWRITE_RETRY_BACKOFF_S = "0.4"
+CORS_ORIGINS = "http://localhost:3000,http://127.0.0.1:3000"
+
+# Secrets (set with: wrangler secret put <name>)
+# BEAM_ENDPOINT_URL
+# BEAM_TOKEN
+# APPWRITE_ENDPOINT
+# APPWRITE_PROJECT_ID
+# APPWRITE_API_KEY
+# HF_TOKEN
+
+[observability]
+enabled = true
