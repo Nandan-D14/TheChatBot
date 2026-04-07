@@ -23,7 +23,8 @@ node_modules/
 .turbo/
 out/
 
-# Cloudflare Workers backend
+# Cloudflare Workers
+.wrangler/
 backend-cf/node_modules/
 backend-cf/.wrangler/
 backend-cf/.dev.vars
