@@ -21,10 +21,6 @@
     "remark-gfm": "4.0.1",
     "tailwind-merge": "2.6.1"
   },
-  "optionalDependencies": {
-    "@opennextjs/cloudflare": "^1.18.0",
-    "wrangler": "^4.80.0"
-  },
   "devDependencies": {
     "@types/node": "^22.10.5",
     "@types/react": "^19.0.6",
