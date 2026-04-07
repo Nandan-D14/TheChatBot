@@ -11,7 +11,7 @@ preview_urls = true
 API_HOST = "0.0.0.0"
 API_PORT = "8000"
 APP_ACCESS_KEY = "PES2UG23CS363"
-CORS_ORIGINS = "http://localhost:3000,http://127.0.0.1:3000"
+CORS_ORIGINS = "http://localhost:3000,http://127.0.0.1:3000,https://the-chat-bot.vercel.app"
 
 [[d1_databases]]
 binding = "DB"
