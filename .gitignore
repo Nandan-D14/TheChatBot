@@ -23,6 +23,12 @@ node_modules/
 .turbo/
 out/
 
+# Cloudflare Workers
+.wrangler/
+backend-cf/node_modules/
+backend-cf/.wrangler/
+backend-cf/.dev.vars
+
 # Logs
 *.log
 npm-debug.log*
@@ -37,6 +43,6 @@ Thumbs.db
 *.swp
 *.swo
 .claude/
-
+.qwen/
 # Beam Cloud
 beam_deploy/__pycache__/

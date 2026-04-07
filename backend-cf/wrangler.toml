@@ -1,0 +1,29 @@
+name = "thechatbot-api"
+main = "src/index.ts"
+compatibility_date = "2025-03-03"
+compatibility_flags = ["nodejs_compat"]
+account_id = "315f00f715a05be42f2577e9936a95be"
+workers_dev = true
+preview_urls = true
+
+# Environment variables (set via wrangler secret for sensitive ones)
+[vars]
+API_HOST = "0.0.0.0"
+API_PORT = "8000"
+APP_ACCESS_KEY = "PES2UG23CS363"
+CORS_ORIGINS = "http://localhost:3000,http://127.0.0.1:3000"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "thechatbot-db"
+# Replace with your Cloudflare D1 database IDs from `wrangler d1 create thechatbot-db`.
+database_id = "72c9ce28-a8e7-4e57-aaf1-518c9b5b2003"
+preview_database_id = "72c9ce28-a8e7-4e57-aaf1-518c9b5b2003"
+
+# Secrets (set with: wrangler secret put <name>)
+# BEAM_ENDPOINT_URL
+# BEAM_TOKEN
+# HF_TOKEN
+
+[observability]
+enabled = true

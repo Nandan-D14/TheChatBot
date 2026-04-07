@@ -30,7 +30,7 @@ export function useSessions(): UseSessionsReturn {
 
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/sessions/?user_id=shared-app-user`,
+        `${process.env.NEXT_PUBLIC_API_URL}/sessions?user_id=shared-app-user`,
         { headers: { ...getAuthHeaders() } }
       )
 
@@ -51,7 +51,7 @@ export function useSessions(): UseSessionsReturn {
   const createSession = useCallback(async (title?: string): Promise<string | null> => {
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/sessions/?user_id=shared-app-user`,
+        `${process.env.NEXT_PUBLIC_API_URL}/sessions?user_id=shared-app-user`,
         {
           method: 'POST',
           headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },

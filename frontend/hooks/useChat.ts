@@ -49,7 +49,7 @@ export function useChat(sessionId?: string): UseChatReturn {
       return activeSessionId
     }
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/sessions/?user_id=shared-app-user`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/sessions?user_id=shared-app-user`, {
       method: 'POST',
       headers: {
         ...getAuthHeaders(),

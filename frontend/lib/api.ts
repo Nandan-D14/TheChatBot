@@ -89,7 +89,7 @@ export async function sendChat(request: ChatRequest): Promise<string> {
  * Create a new session
  */
 export async function createSession(title?: string): Promise<Session> {
-  const response = await fetch(`${API_URL}/sessions/`, {
+  const response = await fetch(`${API_URL}/sessions`, {
     method: 'POST',
     headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ title: title || 'New Chat', user_id: 'shared-app-user' })
@@ -106,7 +106,7 @@ export async function createSession(title?: string): Promise<Session> {
  * Get all sessions for a user
  */
 export async function getSessions(): Promise<Session[]> {
-  const response = await fetch(`${API_URL}/sessions/?user_id=shared-app-user`, {
+  const response = await fetch(`${API_URL}/sessions?user_id=shared-app-user`, {
     headers: { ...getAuthHeaders() }
   })
 
