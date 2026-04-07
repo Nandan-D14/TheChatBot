@@ -24,15 +24,39 @@ This starts Wrangler dev server on `http://localhost:8787`.
 ```powershell
 wrangler secret put BEAM_ENDPOINT_URL
 wrangler secret put BEAM_TOKEN
-wrangler secret put APPWRITE_ENDPOINT
-wrangler secret put APPWRITE_PROJECT_ID
-wrangler secret put APPWRITE_API_KEY
 wrangler secret put HF_TOKEN
 ```
 
 You'll be prompted to paste each value.
 
-### 4. Deploy
+### 4. Initialize local D1 schema
+
+```powershell
+npm run db:init:local
+```
+
+This applies `migrations/001_init.sql` to your local D1 database used by Wrangler.
+
+### 5. (Optional) One-time Appwrite data migration
+
+Set Appwrite export env vars in your shell, then generate and import SQL:
+
+```powershell
+$env:APPWRITE_ENDPOINT="https://<region>.cloud.appwrite.io/v1"
+$env:APPWRITE_PROJECT_ID="<project-id>"
+$env:APPWRITE_API_KEY="<api-key>"
+$env:APPWRITE_DB_ID="<database-id>"
+$env:APPWRITE_SESSIONS_COLLECTION_ID="sessions"
+$env:APPWRITE_MESSAGES_COLLECTION_ID="messages"
+$env:APPWRITE_MEMORY_COLLECTION_ID="memory"
+
+npm run migrate:appwrite:export
+npm run migrate:appwrite:import:local
+```
+
+This generates `migrations/seed_from_appwrite.sql` and imports it into local D1.
+
+### 6. Deploy
 
 ```powershell
 npm run deploy
@@ -40,7 +64,7 @@ npm run deploy
 
 Your API will be live at `https://thechatbot-api.<your-account>.workers.dev`
 
-### 5. Update frontend `.env.local`
+### 7. Update frontend `.env.local`
 
 ```env
 NEXT_PUBLIC_API_URL=https://thechatbot-api.<your-account>.workers.dev
@@ -51,7 +75,7 @@ NEXT_PUBLIC_API_URL=https://thechatbot-api.<your-account>.workers.dev
 ```
 Cloudflare Workers (Hono)
   ├─ BeamLLM → Beam Cloud (your GPU endpoint, unchanged)
-  ├─ Appwrite → Appwrite DB/Auth (unchanged)
+  ├─ D1 → Cloudflare managed SQLite for sessions/messages/memory
   └─ Memory → Conversation + User memory
 ```
 
@@ -82,14 +106,11 @@ Cloudflare Workers (Hono)
 - FastAPI → Hono (TypeScript)
 - Python `requests`/`aiohttp` → Native `fetch()`
 - Pydantic models → Manual validation
-- `appwrite` Python SDK → `node-appwrite` SDK
-- Thread-based retry → Promise-based retry with `setTimeout`
+- Appwrite database collections → Cloudflare D1 tables
 
 ### What stayed the same
 - All endpoint paths (with `/api/` prefix)
-- All env var names
 - Auth mechanism (`x-app-access-key`)
-- Appwrite collections/schemas
 - Beam LLM interface
 - SSE streaming format
 
@@ -98,6 +119,7 @@ Cloudflare Workers (Hono)
 - Legacy compatibility aliases (`/chat/*`, `/sessions/*`, `/memory/*`) are supported for existing frontend clients during migration
 - New integrations should target `/api/*` endpoints
 - CORS uses an explicit allowlist from `CORS_ORIGINS` and rejects unknown origins
+- D1 schema lives in `migrations/001_init.sql`
 
 ## Free Tier Limits
 
@@ -113,6 +135,9 @@ Cloudflare Workers (Hono)
 | `npm run dev` | Start local dev server |
 | `npm run deploy` | Deploy to Cloudflare |
 | `npm run typecheck` | Run TypeScript type checking |
+| `npm run db:init:local` | Apply local D1 schema migration |
+| `npm run migrate:appwrite:export` | Export Appwrite collections to SQL |
+| `npm run migrate:appwrite:import:local` | Import generated SQL into local D1 |
 
 ## File Structure
 
@@ -125,9 +150,14 @@ backend-cf/
       beam_llm.ts     (Beam client + streaming)
       memory.ts       (conversation + user memory)
     services/
-      appwrite.ts     (Appwrite database service)
+      d1.ts           (D1 database service)
     middleware/
       auth.ts         (x-app-access-key middleware)
+  migrations/
+    001_init.sql      (sessions/messages/memory schema)
+    seed_from_appwrite.sql (generated one-time import script)
+  scripts/
+    export-appwrite-to-sql.mjs
   wrangler.toml       (Cloudflare config)
   package.json
   tsconfig.json

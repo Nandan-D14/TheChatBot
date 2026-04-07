@@ -1,4 +1,4 @@
-import type { AppwriteService } from "../services/appwrite";
+import type { D1Service } from "../services/d1";
 
 interface ChatMessage {
   type: "user" | "ai";
@@ -8,25 +8,25 @@ interface ChatMessage {
 export class ConversationMemory {
   private messages: ChatMessage[] = [];
   private windowSize: number;
-  private appwriteService?: AppwriteService;
+  private storageService?: D1Service;
   private sessionId?: string;
 
-  constructor(windowSize: number = 20, appwriteService?: AppwriteService, sessionId?: string) {
+  constructor(windowSize: number = 20, storageService?: D1Service, sessionId?: string) {
     this.windowSize = windowSize;
-    this.appwriteService = appwriteService;
+    this.storageService = storageService;
     this.sessionId = sessionId;
   }
 
   addUserMessage(content: string): void {
     this.messages.push({ type: "user", content });
     this.trimWindow();
-    this.persistToAppwrite("user", content);
+    this.persistMessage("user", content);
   }
 
   addAiMessage(content: string): void {
     this.messages.push({ type: "ai", content });
     this.trimWindow();
-    this.persistToAppwrite("assistant", content);
+    this.persistMessage("assistant", content);
   }
 
   getMessages(): ChatMessage[] {
@@ -50,10 +50,10 @@ export class ConversationMemory {
     }
   }
 
-  private persistToAppwrite(role: string, content: string): void {
-    if (this.appwriteService && this.sessionId) {
+  private persistMessage(role: string, content: string): void {
+    if (this.storageService && this.sessionId) {
       // Fire-and-forget, don't await
-      this.appwriteService
+      this.storageService
         .saveMessage(this.sessionId, role, content)
         .catch((err) => console.error("Failed to persist message:", err));
     }
@@ -61,24 +61,24 @@ export class ConversationMemory {
 }
 
 export class UserMemory {
-  private appwriteService: AppwriteService;
+  private storageService: D1Service;
   private userId: string;
 
-  constructor(appwriteService: AppwriteService, userId: string) {
-    this.appwriteService = appwriteService;
+  constructor(storageService: D1Service, userId: string) {
+    this.storageService = storageService;
     this.userId = userId;
   }
 
   async getSummary(): Promise<string | null> {
-    return this.appwriteService.getMemory(this.userId);
+    return this.storageService.getMemory(this.userId);
   }
 
   async saveSummary(summary: string): Promise<void> {
-    await this.appwriteService.saveMemory(this.userId, summary);
+    await this.storageService.saveMemory(this.userId, summary);
   }
 
   async delete(): Promise<void> {
-    await this.appwriteService.deleteMemory(this.userId);
+    await this.storageService.deleteMemory(this.userId);
   }
 
   async updateWithConversation(messages: string[]): Promise<void> {

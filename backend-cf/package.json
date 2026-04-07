@@ -5,11 +5,13 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy --minify",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:init:local": "wrangler d1 execute DB --local --file migrations/001_init.sql",
+    "migrate:appwrite:export": "node scripts/export-appwrite-to-sql.mjs",
+    "migrate:appwrite:import:local": "wrangler d1 execute DB --local --file migrations/seed_from_appwrite.sql"
   },
   "dependencies": {
-    "hono": "^4.7.0",
-    "node-appwrite": "^14.0.0"
+    "hono": "^4.7.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250303.0",

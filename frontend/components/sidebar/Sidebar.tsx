@@ -44,7 +44,7 @@ export function Sidebar({ onSessionChange, onClose }: SidebarProps) {
 
       try {
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/sessions/?user_id=shared-app-user`,
+          `${process.env.NEXT_PUBLIC_API_URL}/sessions?user_id=shared-app-user`,
           { headers: { ...getAuthHeaders() }, signal: controller.signal }
         )
 

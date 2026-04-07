@@ -1,13 +1,16 @@
 import { Hono, type Context } from "hono";
 import { streamSSE } from "hono/streaming";
+import { trimTrailingSlash } from "hono/trailing-slash";
 import type { Env, Config } from "./core/config";
 import { getConfig } from "./core/config";
 import { BeamLLM } from "./core/beam_llm";
-import { AppwriteService } from "./services/appwrite";
+import { D1Service } from "./services/d1";
 import { authMiddleware } from "./middleware/auth";
 import { UserMemory } from "./core/memory";
 
 const app = new Hono<{ Bindings: Env; Variables: { userId: string; email: string } }>();
+
+app.use(trimTrailingSlash());
 
 // ── Helpers ──
 
@@ -16,9 +19,8 @@ function getBeamLLM(env: Env): BeamLLM {
   return new BeamLLM(config.beamEndpoint, config.beamToken);
 }
 
-function getAppwriteService(env: Env): AppwriteService {
-  const config = getConfig(env);
-  return new AppwriteService(config);
+function getStorageService(env: Env): D1Service {
+  return new D1Service(env.DB);
 }
 
 function getConfigSafe(env: Env): Config {
@@ -108,18 +110,16 @@ app.get("/health", (c) =>
 );
 
 app.get("/info", async (c) => {
-  const appwriteService = getAppwriteService(c.env);
-  const appwriteReady = await appwriteService.verifyReady().catch(() => false);
+  const storageService = getStorageService(c.env);
+  const d1Ready = await storageService.verifyReady().catch(() => false);
   const config = getConfigSafe(c.env);
 
   return c.json({
     beam_configured:
       !!c.env.BEAM_ENDPOINT_URL &&
       c.env.BEAM_ENDPOINT_URL !== "https://your-app.beam.cloud",
-    appwrite_configured:
-      !!c.env.APPWRITE_ENDPOINT &&
-      c.env.APPWRITE_ENDPOINT !== "http://localhost/v1",
-    appwrite_ready: appwriteReady,
+    storage_provider: "cloudflare-d1",
+    d1_ready: d1Ready,
     cors_origins: config.corsOrigins,
   });
 });
@@ -137,7 +137,7 @@ app.use("/api/*", async (c, next) => {
 app.post("/api/chat/stream", async (c) => {
   const userId = c.get("userId");
   const beamLLM = getBeamLLM(c.env);
-  const appwriteService = getAppwriteService(c.env);
+  const storageService = getStorageService(c.env);
 
   let body: unknown;
   try {
@@ -158,19 +158,19 @@ app.post("/api/chat/stream", async (c) => {
     return c.json({ error: "prompt and session_id are required" }, 400);
   }
 
-  const session = await appwriteService.getSession(sessionId);
+  const session = await storageService.getSession(sessionId);
   if (!session || session.user_id !== userId) {
     return c.json({ error: "Session not found or not owned by user" }, 404);
   }
 
-  await appwriteService
+  await storageService
     .saveMessage(sessionId, "user", prompt)
     .catch((err) => console.error("Failed to save user message:", err));
 
-  const msgCount = await appwriteService.getMessageCount(sessionId);
+  const msgCount = await storageService.getMessageCount(sessionId);
   if (msgCount <= 1 && session.title === "New Chat") {
     const title = prompt.slice(0, 50) + (prompt.length > 50 ? "..." : "");
-    await appwriteService
+    await storageService
       .updateSessionTitle(sessionId, title)
       .catch((err) => console.error("Failed to auto-title:", err));
   }
@@ -202,7 +202,7 @@ app.post("/api/chat/stream", async (c) => {
     });
     await stream.writeSSE({ data: "[DONE]" });
 
-    await appwriteService
+    await storageService
       .saveMessage(sessionId, "assistant", fullResponse)
       .catch((err) => console.error("Failed to save AI message:", err));
   });
@@ -211,7 +211,7 @@ app.post("/api/chat/stream", async (c) => {
 app.post("/api/chat/non-stream", async (c) => {
   const userId = c.get("userId");
   const beamLLM = getBeamLLM(c.env);
-  const appwriteService = getAppwriteService(c.env);
+  const storageService = getStorageService(c.env);
 
   let body: unknown;
   try {
@@ -232,19 +232,19 @@ app.post("/api/chat/non-stream", async (c) => {
     return c.json({ error: "prompt and session_id are required" }, 400);
   }
 
-  const session = await appwriteService.getSession(sessionId);
+  const session = await storageService.getSession(sessionId);
   if (!session || session.user_id !== userId) {
     return c.json({ error: "Session not found or not owned by user" }, 404);
   }
 
-  await appwriteService
+  await storageService
     .saveMessage(sessionId, "user", prompt)
     .catch((err) => console.error("Failed to save user message:", err));
 
-  const msgCount = await appwriteService.getMessageCount(sessionId);
+  const msgCount = await storageService.getMessageCount(sessionId);
   if (msgCount <= 1 && session.title === "New Chat") {
     const title = prompt.slice(0, 50) + (prompt.length > 50 ? "..." : "");
-    await appwriteService
+    await storageService
       .updateSessionTitle(sessionId, title)
       .catch((err) => console.error("Failed to auto-title:", err));
   }
@@ -256,7 +256,7 @@ app.post("/api/chat/non-stream", async (c) => {
     max_tokens: maxTokens,
   });
 
-  await appwriteService
+  await storageService
     .saveMessage(sessionId, "assistant", response)
     .catch((err) => console.error("Failed to save AI message:", err));
 
@@ -266,7 +266,7 @@ app.post("/api/chat/non-stream", async (c) => {
 app.post("/api/chat/stream-full", async (c) => {
   const userId = c.get("userId");
   const beamLLM = getBeamLLM(c.env);
-  const appwriteService = getAppwriteService(c.env);
+  const storageService = getStorageService(c.env);
 
   let body: unknown;
   try {
@@ -287,19 +287,19 @@ app.post("/api/chat/stream-full", async (c) => {
     return c.json({ error: "prompt and session_id are required" }, 400);
   }
 
-  const session = await appwriteService.getSession(sessionId);
+  const session = await storageService.getSession(sessionId);
   if (!session || session.user_id !== userId) {
     return c.json({ error: "Session not found or not owned by user" }, 404);
   }
 
-  await appwriteService
+  await storageService
     .saveMessage(sessionId, "user", prompt)
     .catch((err) => console.error("Failed to save user message:", err));
 
-  const msgCount = await appwriteService.getMessageCount(sessionId);
+  const msgCount = await storageService.getMessageCount(sessionId);
   if (msgCount <= 1 && session.title === "New Chat") {
     const title = prompt.slice(0, 50) + (prompt.length > 50 ? "..." : "");
-    await appwriteService
+    await storageService
       .updateSessionTitle(sessionId, title)
       .catch((err) => console.error("Failed to auto-title:", err));
   }
@@ -329,7 +329,7 @@ app.post("/api/chat/stream-full", async (c) => {
       });
       await stream.writeSSE({ data: "[DONE]" });
 
-      await appwriteService
+      await storageService
         .saveMessage(sessionId, "assistant", fullResponse)
         .catch((err) => console.error("Failed to save AI message:", err));
     } catch (err) {
@@ -346,7 +346,7 @@ app.post("/api/chat/stream-full", async (c) => {
 
 app.post("/api/sessions", async (c) => {
   const userId = c.get("userId");
-  const appwriteService = getAppwriteService(c.env);
+  const storageService = getStorageService(c.env);
 
   let body: unknown;
   try {
@@ -358,59 +358,38 @@ app.post("/api/sessions", async (c) => {
   const b = body as Record<string, unknown>;
   const title = typeof b.title === "string" ? b.title : "New Chat";
 
-  const session = await appwriteService.createSessionRecord(userId, title);
+  const session = await storageService.createSessionRecord(userId, title);
 
-  return c.json(
-    {
-      session_id: session.$id,
-      user_id: (session.user_id as string) || userId,
-      title: (session.title as string) || title,
-      created_at:
-        (session.created_at as string) || new Date().toISOString(),
-    },
-    201
-  );
+  return c.json(session, 201);
 });
 
 app.get("/api/sessions", async (c) => {
   const userId = c.get("userId");
-  const appwriteService = getAppwriteService(c.env);
-  const sessions = await appwriteService.getSessions(userId);
+  const storageService = getStorageService(c.env);
+  const sessions = await storageService.getSessions(userId);
 
-  return c.json(
-    sessions.map((s) => ({
-      session_id: s.$id as string,
-      user_id: s.user_id as string,
-      title: s.title as string,
-      created_at: s.created_at as string,
-    }))
-  );
+  return c.json(sessions);
 });
 
 app.get("/api/sessions/:sessionId", async (c) => {
   const userId = c.get("userId");
   const sessionId = c.req.param("sessionId");
-  const appwriteService = getAppwriteService(c.env);
+  const storageService = getStorageService(c.env);
 
-  const session = await appwriteService.getSession(sessionId);
+  const session = await storageService.getSession(sessionId);
   if (!session || session.user_id !== userId) {
     return c.json({ error: "Session not found" }, 404);
   }
 
-  return c.json({
-    session_id: session.$id as string,
-    user_id: session.user_id as string,
-    title: session.title as string,
-    created_at: session.created_at as string,
-  });
+  return c.json(session);
 });
 
 app.patch("/api/sessions/:sessionId", async (c) => {
   const userId = c.get("userId");
   const sessionId = c.req.param("sessionId");
-  const appwriteService = getAppwriteService(c.env);
+  const storageService = getStorageService(c.env);
 
-  const session = await appwriteService.getSession(sessionId);
+  const session = await storageService.getSession(sessionId);
   if (!session || session.user_id !== userId) {
     return c.json({ error: "Session not found" }, 404);
   }
@@ -428,51 +407,40 @@ app.patch("/api/sessions/:sessionId", async (c) => {
     return c.json({ error: "title is required" }, 400);
   }
 
-  const updated = await appwriteService.updateSessionTitle(sessionId, title);
+  const updated = await storageService.updateSessionTitle(sessionId, title);
 
-  return c.json({
-    session_id: updated.$id as string,
-    user_id: updated.user_id as string,
-    title: updated.title as string,
-    created_at: updated.created_at as string,
-  });
+  return c.json(updated);
 });
 
 app.delete("/api/sessions/:sessionId", async (c) => {
   const userId = c.get("userId");
   const sessionId = c.req.param("sessionId");
-  const appwriteService = getAppwriteService(c.env);
+  const storageService = getStorageService(c.env);
 
-  const session = await appwriteService.getSession(sessionId);
+  const session = await storageService.getSession(sessionId);
   if (!session || session.user_id !== userId) {
     return c.json({ error: "Session not found" }, 404);
   }
 
-  await appwriteService.deleteSessionRecord(sessionId);
+  await storageService.deleteSessionRecord(sessionId);
   return c.json({ message: "Session deleted" });
 });
 
 app.get("/api/sessions/:sessionId/messages", async (c) => {
   const userId = c.get("userId");
   const sessionId = c.req.param("sessionId");
-  const appwriteService = getAppwriteService(c.env);
+  const storageService = getStorageService(c.env);
 
-  const session = await appwriteService.getSession(sessionId);
+  const session = await storageService.getSession(sessionId);
   if (!session || session.user_id !== userId) {
     return c.json({ error: "Session not found" }, 404);
   }
 
-  const messages = await appwriteService.getMessages(sessionId);
+  const messages = await storageService.getMessages(sessionId);
 
   return c.json({
     session_id: sessionId,
-    messages: messages.map((m) => ({
-      message_id: m.$id as string,
-      session_id: m.session_id as string,
-      role: m.role as string,
-      content: m.content as string,
-      created_at: m.created_at as string,
-    })),
+    messages,
     count: messages.length,
   });
 });
@@ -481,8 +449,8 @@ app.get("/api/sessions/:sessionId/messages", async (c) => {
 
 app.get("/api/memory/me", async (c) => {
   const userId = c.get("userId");
-  const appwriteService = getAppwriteService(c.env);
-  const userMemory = new UserMemory(appwriteService, userId);
+  const storageService = getStorageService(c.env);
+  const userMemory = new UserMemory(storageService, userId);
   const summary = await userMemory.getSummary();
 
   return c.json({ user_id: userId, summary: summary || "" });
@@ -490,7 +458,7 @@ app.get("/api/memory/me", async (c) => {
 
 app.post("/api/memory", async (c) => {
   const userId = c.get("userId");
-  const appwriteService = getAppwriteService(c.env);
+  const storageService = getStorageService(c.env);
 
   let body: unknown;
   try {
@@ -505,7 +473,7 @@ app.post("/api/memory", async (c) => {
     return c.json({ error: "summary is required" }, 400);
   }
 
-  const userMemory = new UserMemory(appwriteService, userId);
+  const userMemory = new UserMemory(storageService, userId);
   await userMemory.saveSummary(summary);
 
   return c.json({ message: "Memory saved", user_id: userId });
@@ -513,8 +481,8 @@ app.post("/api/memory", async (c) => {
 
 app.delete("/api/memory/me", async (c) => {
   const userId = c.get("userId");
-  const appwriteService = getAppwriteService(c.env);
-  const userMemory = new UserMemory(appwriteService, userId);
+  const storageService = getStorageService(c.env);
+  const userMemory = new UserMemory(storageService, userId);
   await userMemory.delete();
 
   return c.json({ message: "Memory deleted" });
@@ -522,7 +490,7 @@ app.delete("/api/memory/me", async (c) => {
 
 app.post("/api/memory/update", async (c) => {
   const userId = c.get("userId");
-  const appwriteService = getAppwriteService(c.env);
+  const storageService = getStorageService(c.env);
 
   let body: unknown;
   try {
@@ -536,7 +504,7 @@ app.post("/api/memory/update", async (c) => {
     ? (b.messages as string[])
     : [];
 
-  const userMemory = new UserMemory(appwriteService, userId);
+  const userMemory = new UserMemory(storageService, userId);
   await userMemory.updateWithConversation(messages);
 
   return c.json({ message: "Memory updated", user_id: userId });
