@@ -55,7 +55,7 @@ export function ChatWindow({ sessionId, isSidebarOpen, onToggleSidebar }: ChatWi
         </div>
         <div className="absolute left-1/2 -translate-x-1/2 top-4">
           <button className="flex items-center gap-2 px-3 py-1 rounded-full bg-[#161616] border border-[#2B2B2B] hover:bg-[#2B2B2B] hover:border-[#383838] transition-colors text-[13px] font-medium text-zinc-400 font-sans">
-            Free plan <span className="opacity-40">·</span> <span className="text-zinc-300 underline decoration-zinc-600 underline-offset-4">Upgrade</span>
+            Private
           </button>
         </div>
         <div className="flex items-center gap-2">
@@ -86,7 +86,7 @@ export function ChatWindow({ sessionId, isSidebarOpen, onToggleSidebar }: ChatWi
               </div>
             </div>
             
-            <div className="w-full max-w-3xl mb-8 relative z-30">
+            <div className="w-full max-w-2xl mb-8 relative z-30">
               <InputBar
                 onSend={sendMessage}
                 isLoading={streaming}
@@ -94,7 +94,7 @@ export function ChatWindow({ sessionId, isSidebarOpen, onToggleSidebar }: ChatWi
               />
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-2.5 max-w-3xl px-4 mt-2">
+            <div className="flex flex-wrap items-center justify-center gap-2.5 max-w-2xl px-4 mt-2">
               {SUGGESTIONS.map((suggestion, i) => (
                 <button
                   key={i}
@@ -118,7 +118,7 @@ export function ChatWindow({ sessionId, isSidebarOpen, onToggleSidebar }: ChatWi
             `}</style>
           </div>
         ) : (
-          <div className="max-w-3xl mx-auto flex flex-col gap-6 p-4 sm:p-6 pt-6">
+          <div className="max-w-[90%] lg:max-w-4xl mx-auto flex flex-col gap-6 p-4 sm:p-6 pt-6 w-full">
             {error && (
               <div className="p-4 bg-red-950/30 border border-red-900/50 rounded-xl text-red-200 text-sm flex items-start gap-3">
                 <Info size={16} className="mt-0.5 text-red-400 flex-shrink-0" />

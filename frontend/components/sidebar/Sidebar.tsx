@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { Plus, Loader2, PanelLeftClose } from 'lucide-react'
+import { Plus, Loader2, PanelLeftClose, Blocks, LayoutDashboard, Settings } from 'lucide-react'
 import { SessionItem } from './SessionItem'
 import { getAuthHeaders, hasValidAccessKey } from '@/lib/userIdentity'
 
@@ -174,6 +174,34 @@ export function Sidebar({ onSessionChange, onClose }: SidebarProps) {
             />
           ))
         )}
+      </div>
+
+      {/* Bottom Sections */}
+      <div className="mt-auto px-2 pb-2 pt-4 border-t border-zinc-800/40 space-y-1">
+        <button
+          onClick={() => { router.push('/connectors'); onClose?.() }}
+          className="w-full flex items-center gap-3 px-3 py-2.5 text-[13px] font-medium text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50 rounded-xl transition-colors"
+          style={{ fontFamily: "'Inter', sans-serif" }}
+        >
+          <Blocks size={16} />
+          Connectors
+        </button>
+        <button
+          onClick={() => { router.push('/dashboard'); onClose?.() }}
+          className="w-full flex items-center gap-3 px-3 py-2.5 text-[13px] font-medium text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50 rounded-xl transition-colors"
+          style={{ fontFamily: "'Inter', sans-serif" }}
+        >
+          <LayoutDashboard size={16} />
+          Dashboard
+        </button>
+        <button
+          onClick={() => { router.push('/settings'); onClose?.() }}
+          className="w-full flex items-center gap-3 px-3 py-2.5 text-[13px] font-medium text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50 rounded-xl transition-colors"
+          style={{ fontFamily: "'Inter', sans-serif" }}
+        >
+          <Settings size={16} />
+          Settings
+        </button>
       </div>
     </div>
   )

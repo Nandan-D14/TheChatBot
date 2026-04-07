@@ -183,28 +183,45 @@ export function useChat(sessionId?: string): UseChatReturn {
 
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
+      let streamBuffer = ''
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
 
-        const chunk = decoder.decode(value)
-        const lines = chunk.split('\n\n')
-
-        for (const line of lines) {
-          if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-            try {
-              const data = JSON.parse(line.replace('data: ', ''))
-              
-              if (data.token && !data.complete) {
-                buffer += data.token
-                setMessages(prev => [
-                  ...prev.slice(0, -1),
-                  { role: 'assistant', content: buffer },
-                ])
+        streamBuffer += decoder.decode(value, { stream: true })
+        
+        let i
+        while ((i = streamBuffer.indexOf('\n\n')) >= 0) {
+          const sseMessage = streamBuffer.slice(0, i)
+          streamBuffer = streamBuffer.slice(i + 2)
+          
+          const lines = sseMessage.split('\n')
+          let dataStr = ''
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              dataStr = line.substring(6)
+              if (dataStr === '[DONE]') {
+                dataStr = ''
+                break
               }
-            } catch {
-              // Skip invalid JSON
+            }
+          }
+          
+          if (dataStr) {
+            try {
+              const data = JSON.parse(dataStr)
+              if (data.token !== undefined && !data.complete) {
+                buffer += data.token
+                setMessages(prev => {
+                  const newMessages = [...prev]
+                  newMessages[newMessages.length - 1] = { role: 'assistant', content: buffer }
+                  return newMessages
+                })
+              }
+            } catch (e) {
+              console.error('Error parsing SSE JSON:', e, 'Data:', dataStr)
             }
           }
         }

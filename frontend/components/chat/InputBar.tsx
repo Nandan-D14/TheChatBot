@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Send, Loader2, Plus } from 'lucide-react'
+import { Send, Loader2, Plus, Paperclip } from 'lucide-react'
 
 interface InputBarProps {
   onSend: (message: string) => void
@@ -51,7 +51,7 @@ export function InputBar({ onSend, isLoading, isCentered }: InputBarProps) {
   }
 
   const formContent = (
-    <form onSubmit={handleSubmit} className={`w-full max-w-[700px] mx-auto relative flex flex-col bg-[#2A2A2A] rounded-[24px] p-3 transition-all min-h-[60px] focus-within:ring-1 focus-within:ring-zinc-600 ${isCentered ? 'shadow-sm' : 'shadow-lg border border-[#3A3A3A]'}`}>
+    <form onSubmit={handleSubmit} className={`w-full max-w-[672px] mx-auto relative flex flex-col bg-[#2A2A2A] rounded-[24px] p-3.5 transition-all min-h-[66px] focus-within:ring-1 focus-within:ring-zinc-600 ${isCentered ? 'shadow-[0_10px_40px_rgba(0,0,0,0.4)]' : 'shadow-[0_20px_60px_rgba(0,0,0,0.7)] border border-[#3A3A3A]'}`}>
       {/* Textarea */}
       <div className="flex flex-col relative w-full mb-1">
         <textarea
@@ -71,15 +71,26 @@ export function InputBar({ onSend, isLoading, isCentered }: InputBarProps) {
       <div className="flex items-center justify-between mt-auto">
         <button
           type="button"
-          className="p-2 text-zinc-400 hover:text-zinc-200 transition-colors ml-1"
+          className="flex items-center gap-1.5 p-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-[#3A3A3A] transition-colors ml-1 rounded-lg"
           onClick={() => {}}
         >
-          <Plus size={22} strokeWidth={2} />
+          <Plus size={20} strokeWidth={2} />
         </button>
+        <button
+          type="button"
+          className="flex items-center gap-1.5 p-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-[#3A3A3A] transition-colors ml-1 rounded-lg"
+          onClick={() => {}}
+        >
+          <Paperclip size={18} strokeWidth={2} />
+        </button>
+
+        <div className="flex items-center gap-1.5 mr-auto pl-2">
+          {/* spacer to push everything to the right if needed, or keep next items here */}
+        </div>
 
         <div className="flex items-center gap-1.5 mr-1">
           <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 text-[#A1A1AA] cursor-pointer hover:bg-[#3A3A3A] hover:text-zinc-200 rounded-lg transition-colors h-8 text-[13px] font-medium" style={{ fontFamily: "'Inter', sans-serif" }}>
-            Qwen 2.5 <span className="opacity-70 font-normal">Extended</span>
+            Qwen 2.5 <span className="opacity-70 font-normal">Private</span>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-1 opacity-70"><path d="m6 9 6 6 6-6"/></svg>
           </div>
 
@@ -116,10 +127,12 @@ export function InputBar({ onSend, isLoading, isCentered }: InputBarProps) {
   }
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 bg-[#1E1E1E] pt-8 pb-4 px-4 overflow-hidden border-t border-[#2A2A2A]">
-      {formContent}
-      <div className="text-center mt-3 h-[20px]">
-        <p className="text-[12px] text-zinc-500 font-normal">AI models can make mistakes. Consider verifying important information.</p>
+    <div className="absolute bottom-0 left-0 right-0 bg-transparent pt-4 pb-2 px-4 overflow-hidden pointer-events-none">
+      <div className="pointer-events-auto">
+        {formContent}
+      </div>
+      <div className="text-center mt-1.5 h-[16px] pointer-events-auto">
+        <p className="text-[10px] text-zinc-500 font-normal">AI models can make mistakes. Consider verifying important information.</p>
       </div>
     </div>
   )

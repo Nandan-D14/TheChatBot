@@ -1,6 +1,6 @@
 'use client'
 
-import { Bot, User, Check, Copy } from 'lucide-react'
+import { Bot, Check, Copy } from 'lucide-react'
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -55,27 +55,25 @@ export function MessageBubble({ content, role, isStreaming }: MessageBubbleProps
 
   return (
     <div className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'} mb-6 group`}>
-      <div className={`flex max-w-[100%] md:max-w-[85%] gap-4 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
-        {!isUser ? (
+      <div className={`flex w-full md:max-w-[95%] gap-4 ${isUser ? 'flex-row-reverse md:max-w-[85%]' : 'flex-row'}`}>
+        {!isUser && (
           <div className="flex-shrink-0 h-10 w-10 mt-1 rounded-full flex items-center justify-center bg-transparent border border-[#3A3A3A] overflow-hidden shadow-sm self-start">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-[#E07A5F] transition-transform duration-700 ease-in-out group-hover:rotate-[360deg]">
               <path d="M12 2L13.5 9.5L21 11L13.5 12.5L12 20L10.5 12.5L3 11L10.5 9.5L12 2Z" fill="currentColor"/>
             </svg>
           </div>
-        ) : (
-          <div className="flex-shrink-0 h-10 w-10 mt-1 rounded-full flex items-center justify-center bg-[#2A2A2A] text-zinc-300 border border-[#3A3A3A] self-start shadow-sm">
-            <User size={18} />
-          </div>
         )}
         
         <div className={`flex flex-col gap-1.5 w-full min-w-0 ${isUser ? 'items-end' : 'items-start'}`}>
-          <span className="text-[13px] font-medium text-zinc-500 px-1 hidden md:block">
-            {isUser ? 'You' : 'Nandan'}
-          </span>
-          <div className={`py-2 text-[15px] leading-relaxed max-w-full overflow-hidden ${
+          {!isUser && (
+            <span className="text-[13px] font-medium text-zinc-500 px-1 hidden md:block">
+              Nandan
+            </span>
+          )}
+          <div className={`text-[15px] leading-relaxed max-w-full overflow-hidden ${
             isUser 
-              ? 'px-5 py-3.5 bg-[#2A2A2A] text-[#E8E2D9] rounded-[24px] rounded-tr-md shadow-sm border border-[#3A3A3A]' 
-              : 'px-1 bg-transparent text-[#E8E2D9]'
+              ? 'px-5 py-3 bg-[#303030] text-[#F5F2ED] rounded-[24px] shadow-sm' 
+              : 'py-2 px-1 bg-transparent text-[#E8E2D9]'
           }`}>
             <div className={`max-w-full font-sans ${isUser ? 'whitespace-pre-wrap' : 'prose prose-invert prose-p:leading-relaxed prose-pre:p-0 prose-pre:bg-transparent prose-pre:m-0 prose-img:rounded-xl prose-a:text-blue-400 marker:text-zinc-500'}`}>
               {!isUser ? (

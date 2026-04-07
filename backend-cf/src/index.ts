@@ -182,13 +182,12 @@ app.post("/api/chat/stream", async (c) => {
     max_tokens: maxTokens,
   });
 
-  const words = fullResponse.split(/\s+/);
+  const tokens = fullResponse.match(/([\s]+|\S+)/g) || [];
 
   return streamSSE(c, async (stream) => {
-    for (let i = 0; i < words.length; i++) {
-      const word = words[i] + " ";
+    for (let i = 0; i < tokens.length; i++) {
       await stream.writeSSE({
-        data: JSON.stringify({ token: word, complete: false }),
+        data: JSON.stringify({ token: tokens[i], complete: false }),
       });
       await new Promise((r) => setTimeout(r, 20));
     }

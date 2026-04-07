@@ -118,15 +118,17 @@ async def chat_stream(
                 max_tokens=512
             )
             
+            import re
+            
             # Stream tokens one by one for SSE
             buffer = ""
-            words = response.split()
+            tokens = re.findall(r'\S+|\s+', response)
             
-            for i, word in enumerate(words):
-                buffer += word + " "
+            for i, token in enumerate(tokens):
+                buffer += token
                 
                 # Yield token in SSE format
-                token_data = {"token": word + " ", "complete": False}
+                token_data = {"token": token, "complete": False}
                 yield f"data: {json.dumps(token_data)}\n\n"
                 
                 # Small delay to simulate streaming (remove in production)
