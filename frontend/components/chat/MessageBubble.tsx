@@ -1,6 +1,6 @@
 'use client'
 
-import { Bot, Check, Copy } from 'lucide-react'
+import { Check, Copy } from 'lucide-react'
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -52,6 +52,17 @@ function CodeBlock({ node, inline, className, children, ...props }: any) {
 
 export function MessageBubble({ content, role, isStreaming }: MessageBubbleProps) {
   const isUser = role === 'user'
+  const [copiedMessage, setCopiedMessage] = useState(false)
+
+  const handleCopyMessage = async () => {
+    try {
+      await navigator.clipboard.writeText(content)
+      setCopiedMessage(true)
+      setTimeout(() => setCopiedMessage(false), 2000)
+    } catch {
+      // Ignore clipboard failures; the message remains visible.
+    }
+  }
 
   return (
     <div className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'} mb-6 group`}>
@@ -103,6 +114,18 @@ export function MessageBubble({ content, role, isStreaming }: MessageBubbleProps
               )}
               {isStreaming && <span className="ml-1 inline-block w-2.5 h-4 bg-zinc-400 animate-pulse align-middle rounded-sm" />}
             </div>
+          </div>
+          <div className="mt-2 flex w-full justify-end px-1">
+            <button
+              type="button"
+              onClick={handleCopyMessage}
+              className="inline-flex items-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-[12px] text-zinc-500 transition-all hover:border-[#3A3A3A] hover:bg-[#2A2A2A] hover:text-zinc-200 focus-visible:text-zinc-200 focus:outline-none"
+              aria-label="Copy message"
+              title="Copy message"
+            >
+              {copiedMessage ? <Check size={13} className="text-green-500" /> : <Copy size={13} />}
+              <span>{copiedMessage ? 'Copied' : 'Copy'}</span>
+            </button>
           </div>
         </div>
       </div>
