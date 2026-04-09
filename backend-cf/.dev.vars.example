@@ -1,0 +1,13 @@
+# Backend Local Secrets Template
+# Copy this file to .dev.vars and update the values for your local environment.
+# Note: These are for local development ONLY.
+# In production, use `wrangler secret put <SECRET_NAME>` to set these securely.
+
+# The URL for your Beam LLM deployment
+BEAM_ENDPOINT_URL=https://your-beam-endpoint.app.beam.cloud
+
+# The token required to access your Beam endpoint
+BEAM_TOKEN=your_beam_token
+
+# (Optional) Hugging Face token if using gated or private models
+HF_TOKEN=your_hf_token
