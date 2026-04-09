@@ -37,26 +37,7 @@ npm run db:init:local
 
 This applies `migrations/001_init.sql` to your local D1 database used by Wrangler.
 
-### 5. (Optional) One-time Appwrite data migration
-
-Set Appwrite export env vars in your shell, then generate and import SQL:
-
-```powershell
-$env:APPWRITE_ENDPOINT="https://<region>.cloud.appwrite.io/v1"
-$env:APPWRITE_PROJECT_ID="<project-id>"
-$env:APPWRITE_API_KEY="<api-key>"
-$env:APPWRITE_DB_ID="<database-id>"
-$env:APPWRITE_SESSIONS_COLLECTION_ID="sessions"
-$env:APPWRITE_MESSAGES_COLLECTION_ID="messages"
-$env:APPWRITE_MEMORY_COLLECTION_ID="memory"
-
-npm run migrate:appwrite:export
-npm run migrate:appwrite:import:local
-```
-
-This generates `migrations/seed_from_appwrite.sql` and imports it into local D1.
-
-### 6. Deploy
+### 5. Deploy
 
 ```powershell
 npm run deploy
@@ -64,7 +45,7 @@ npm run deploy
 
 Your API will be live at `https://thechatbot-api.<your-account>.workers.dev`
 
-### 7. Update frontend `.env.local`
+### 6. Update frontend `.env.local`
 
 ```env
 NEXT_PUBLIC_API_URL=https://thechatbot-api.<your-account>.workers.dev
@@ -106,7 +87,7 @@ Cloudflare Workers (Hono)
 - FastAPI → Hono (TypeScript)
 - Python `requests`/`aiohttp` → Native `fetch()`
 - Pydantic models → Manual validation
-- Appwrite database collections → Cloudflare D1 tables
+- Removed Appwrite database collections → Now using Cloudflare D1 tables
 
 ### What stayed the same
 - All endpoint paths (with `/api/` prefix)
@@ -136,8 +117,6 @@ Cloudflare Workers (Hono)
 | `npm run deploy` | Deploy to Cloudflare |
 | `npm run typecheck` | Run TypeScript type checking |
 | `npm run db:init:local` | Apply local D1 schema migration |
-| `npm run migrate:appwrite:export` | Export Appwrite collections to SQL |
-| `npm run migrate:appwrite:import:local` | Import generated SQL into local D1 |
 
 ## File Structure
 
@@ -155,9 +134,6 @@ backend-cf/
       auth.ts         (x-app-access-key middleware)
   migrations/
     001_init.sql      (sessions/messages/memory schema)
-    seed_from_appwrite.sql (generated one-time import script)
-  scripts/
-    export-appwrite-to-sql.mjs
   wrangler.toml       (Cloudflare config)
   package.json
   tsconfig.json

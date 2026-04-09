@@ -46,3 +46,6 @@ Thumbs.db
 .qwen/
 # Beam Cloud
 beam_deploy/__pycache__/
+
+# Local planning notes
+next-plan.md
