@@ -150,3 +150,29 @@ export async function getSessionMessages(sessionId: string): Promise<ChatMessage
   }))
 }
 
+export interface AnalyticsData {
+  totalMessages: number;
+  activeSessions: number;
+  tokensUsed: number;
+  avgLatency: number;
+  recentActivity: Array<{
+    event_type: string;
+    created_at: string;
+  }>;
+}
+
+/**
+ * Fetch analytics data
+ */
+export async function getAnalytics(timeRange: string = "All time"): Promise<AnalyticsData> {
+  const response = await fetch(`${API_URL}/analytics?timeRange=${encodeURIComponent(timeRange)}`, {
+    headers: { ...getAuthHeaders() }
+  })
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`)
+  }
+
+  return response.json()
+}
+

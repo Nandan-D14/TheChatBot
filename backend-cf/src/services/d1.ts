@@ -188,6 +188,61 @@ export class D1Service {
       .run();
   }
 
+  // -- Analytics --
+
+  async logAnalyticsEvent(
+    userId: string,
+    eventType: string,
+    latencyMs: number | null,
+    tokensUsed: number | null
+  ): Promise<void> {
+    await this.db
+      .prepare(
+        `INSERT INTO analytics_events (id, user_id, event_type, latency_ms, tokens_used, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`
+      )
+      .bind(
+        createId("evt"),
+        userId,
+        eventType,
+        latencyMs,
+        tokensUsed,
+        new Date().toISOString()
+      )
+      .run();
+  }
+
+  async getAnalyticsDashboard(userId: string, timeRange: string = "All time"): Promise<any> {
+    let dateFilter = "1=1"; // default all time
+    const now = new Date();
+    
+    if (timeRange === "Last 7 days") {
+      const past = new Date(now.setDate(now.getDate() - 7));
+      dateFilter = `created_at >= '${past.toISOString()}'`;
+    } else if (timeRange === "Last 30 days") {
+      const past = new Date(now.setDate(now.getDate() - 30));
+      dateFilter = `created_at >= '${past.toISOString()}'`;
+    } else if (timeRange === "This month") {
+      const past = new Date(now.getFullYear(), now.getMonth(), 1);
+      dateFilter = `created_at >= '${past.toISOString()}'`;
+    }
+
+    const [messagesCount, activeSessions, metrics, recentActivity] = await this.db.batch([
+      this.db.prepare(`SELECT COUNT(*) as total FROM messages WHERE session_id IN (SELECT id FROM sessions WHERE user_id = ?1) AND ${dateFilter}`).bind(userId),
+      this.db.prepare(`SELECT COUNT(DISTINCT session_id) as total FROM messages WHERE session_id IN (SELECT id FROM sessions WHERE user_id = ?1) AND ${dateFilter}`).bind(userId),
+      this.db.prepare(`SELECT SUM(tokens_used) as tokens, AVG(latency_ms) as latency FROM analytics_events WHERE user_id = ?1 AND ${dateFilter}`).bind(userId),
+      this.db.prepare(`SELECT event_type, created_at FROM analytics_events WHERE user_id = ?1 AND ${dateFilter} ORDER BY created_at DESC LIMIT 5`).bind(userId),
+    ]);
+
+    return {
+      totalMessages: (messagesCount.results[0] as any)?.total || 0,
+      activeSessions: (activeSessions.results[0] as any)?.total || 0,
+      tokensUsed: (metrics.results[0] as any)?.tokens || 0,
+      avgLatency: (metrics.results[0] as any)?.latency || 0,
+      recentActivity: recentActivity.results || [],
+    };
+  }
+
   // -- Health Check --
 
   async verifyReady(): Promise<boolean> {

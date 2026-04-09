@@ -32,3 +32,15 @@ CREATE INDEX IF NOT EXISTS idx_messages_session_created
 
 CREATE INDEX IF NOT EXISTS idx_memory_user
   ON memory (user_id);
+
+CREATE TABLE IF NOT EXISTS analytics_events (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  latency_ms INTEGER,
+  tokens_used INTEGER,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_analytics_user_created
+  ON analytics_events (user_id, created_at DESC);

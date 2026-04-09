@@ -175,14 +175,17 @@ app.post("/api/chat/stream", async (c) => {
       .catch((err) => console.error("Failed to auto-title:", err));
   }
 
+  const startTime = Date.now();
   const fullResponse = await beamLLM.call({
     prompt,
     history,
     temperature,
     max_tokens: maxTokens,
   });
+  const latencyMs = Date.now() - startTime;
 
   const tokens = fullResponse.match(/([\s]+|\S+)/g) || [];
+  const tokensUsed = tokens.length + (prompt.match(/([\s]+|\S+)/g) || []).length; // rough estimate
 
   return streamSSE(c, async (stream) => {
     for (let i = 0; i < tokens.length; i++) {
@@ -204,6 +207,10 @@ app.post("/api/chat/stream", async (c) => {
     await storageService
       .saveMessage(sessionId, "assistant", fullResponse)
       .catch((err) => console.error("Failed to save AI message:", err));
+      
+    // Log telemetry
+    await storageService.logAnalyticsEvent(userId, "chat_message", latencyMs, tokensUsed)
+      .catch((err) => console.error("Failed to log telemetry:", err));
   });
 });
 
@@ -507,6 +514,22 @@ app.post("/api/memory/update", async (c) => {
   await userMemory.updateWithConversation(messages);
 
   return c.json({ message: "Memory updated", user_id: userId });
+});
+
+// ── Analytics routes ──
+
+app.get("/api/analytics", async (c) => {
+  const userId = c.get("userId");
+  const timeRange = c.req.query("timeRange") || "All time";
+  const storageService = getStorageService(c.env);
+
+  try {
+    const dashboardData = await storageService.getAnalyticsDashboard(userId, timeRange);
+    return c.json(dashboardData);
+  } catch (err) {
+    console.error("Failed to fetch analytics:", err);
+    return c.json({ error: "Failed to fetch analytics data" }, 500);
+  }
 });
 
 // ── Error handler ──
