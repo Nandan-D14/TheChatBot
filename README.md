@@ -7,9 +7,8 @@ Private ChatGPT-like application with a Cloudflare for backend, Next.js frontend
 TheChatBot is a full-stack chat application designed for private/self-controlled deployments.
 
 - Frontend: Next.js 16 + React 19 + Tailwind
-- Backend: FastAPI + LangChain wrapper
-- LLM Inference: Beam endpoint (GPU) with model warm-start
-- Data/Auth: Appwrite (sessions, messages, user context)
+- Backend: Cloudflare + LangChain wrapper
+- LLM Inference: Beam endpoint (GPU) with model cold-start
 
 ## Repository Structure
 
