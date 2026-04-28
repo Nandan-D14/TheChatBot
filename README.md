@@ -1,6 +1,6 @@
 # TheChatBot
 
-Private ChatGPT-like application with a Cloudflare for backend, Next.js frontend and Beam-hosted LLM inference.
+Private ChatGPT-like application with a Cloudflare for backend, Next.js frontend and Beam-self hosted LLM inference.
 
 ## Overview
 
